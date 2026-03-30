@@ -25,7 +25,7 @@ const tx = await client.buildTx({
   sender: signer.address,
   contract: "currency",
   function: "transfer",
-  kwargs: { to: "bob", amount: "5" },
+  kwargs: { to: "bob", amount: 5 },
   stamps: 50_000,
 });
 

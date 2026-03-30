@@ -116,7 +116,7 @@ app.innerHTML = `
         </label>
       </div>
       <label>Kwargs JSON
-        <textarea id="tx-kwargs">{"to":"bob","amount":"5"}</textarea>
+        <textarea id="tx-kwargs">{"to":"bob","amount":5}</textarea>
       </label>
       <div class="row">
         <button id="build-tx">Prepare</button>
