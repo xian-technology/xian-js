@@ -1,0 +1,156 @@
+:root {
+  color-scheme: light;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  line-height: 1.4;
+  color: #13233a;
+  background:
+    radial-gradient(circle at top left, rgba(97, 152, 255, 0.18), transparent 30%),
+    radial-gradient(circle at right center, rgba(22, 184, 146, 0.14), transparent 28%),
+    linear-gradient(180deg, #f7fbff 0%, #eef4fb 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+
+.hero {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1;
+}
+
+.hero p {
+  margin: 0;
+  max-width: 760px;
+  color: #35506f;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(19, 35, 58, 0.08);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 16px 48px rgba(19, 35, 58, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.card h2 {
+  margin-top: 0;
+  margin-bottom: 14px;
+  font-size: 1.1rem;
+}
+
+.stack {
+  display: grid;
+  gap: 10px;
+}
+
+.row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: #35506f;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  border: 1px solid rgba(19, 35, 58, 0.16);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #2346b6, #1788cb);
+  color: white;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  box-shadow: 0 10px 22px rgba(35, 70, 182, 0.18);
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button.secondary {
+  background: white;
+  color: #2346b6;
+  border: 1px solid rgba(35, 70, 182, 0.18);
+  box-shadow: none;
+}
+
+pre {
+  margin: 0;
+  padding: 14px;
+  border-radius: 12px;
+  background: #0f1724;
+  color: #dbe7ff;
+  overflow: auto;
+  min-height: 120px;
+}
+
+.muted {
+  color: #56718f;
+}
+
+.status {
+  display: grid;
+  gap: 6px;
+  font-size: 0.95rem;
+}
+
+.log {
+  min-height: 220px;
+}
+
+@media (max-width: 720px) {
+  #app {
+    padding: 24px 14px 32px;
+  }
+}

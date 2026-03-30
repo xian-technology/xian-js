@@ -1,0 +1,29 @@
+{
+  "name": "@xian/client",
+  "version": "0.1.0",
+  "description": "Typed Xian client, tx helpers, and Ed25519 signer",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xian-technology/xian-js.git",
+    "directory": "packages/client"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "tweetnacl": "^1.0.3"
+  }
+}

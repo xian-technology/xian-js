@@ -1,0 +1,55 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  Ed25519Signer,
+  canonicalizeRuntime,
+  decodeRuntime,
+  encodeRuntime,
+  verifyMessage
+} from "../src/index";
+
+describe("@xian/client encoding", () => {
+  it("canonicalizes payloads with sorted keys", () => {
+    const canonical = canonicalizeRuntime({
+      stamps_supplied: 50000,
+      sender: "a".repeat(64),
+      nonce: 7,
+      kwargs: {
+        to: "bob",
+        amount: "5"
+      },
+      function: "transfer",
+      contract: "currency",
+      chain_id: "xian-local"
+    });
+
+    expect(canonical).toBe(
+      '{"chain_id":"xian-local","contract":"currency","function":"transfer","kwargs":{"amount":"5","to":"bob"},"nonce":7,"sender":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","stamps_supplied":50000}'
+    );
+  });
+
+  it("encodes and decodes bigints with Xian runtime wrappers", () => {
+    const encoded = encodeRuntime({ balance: 2n ** 60n });
+    expect(encoded).toBe('{"balance":{"__big_int__":"1152921504606846976"}}');
+
+    const decoded = decodeRuntime<{ balance: bigint }>(encoded);
+    expect(decoded?.balance).toBe(2n ** 60n);
+  });
+
+  it("signs canonical payload strings with Ed25519", () => {
+    const signer = new Ed25519Signer("1".repeat(64));
+    const message = canonicalizeRuntime({
+      sender: signer.address,
+      contract: "currency",
+      function: "transfer",
+      kwargs: { amount: "5", to: "bob" },
+      nonce: 1,
+      stamps_supplied: 50000,
+      chain_id: "xian-local"
+    });
+
+    const signature = signer.signMessage(message);
+    expect(signature).toHaveLength(128);
+    expect(verifyMessage(signer.address, message, signature)).toBe(true);
+  });
+});
