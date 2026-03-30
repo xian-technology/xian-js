@@ -1,6 +1,6 @@
 # Tests
 
-This folder covers the public behavior of `@xian/provider`.
+This folder covers the public behavior of `@xian-tech/provider`.
 
 Current focus:
 

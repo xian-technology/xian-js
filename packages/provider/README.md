@@ -1,4 +1,4 @@
-# @xian/provider
+# @xian-tech/provider
 
 This package defines the browser wallet provider surface for Xian and ships a
 simple in-memory provider plus injected-wallet discovery helpers.
@@ -7,7 +7,7 @@ It includes:
 
 - `request(...)`-based provider interface
 - account and chain event handling
-- a reference provider that delegates signing and submission to `@xian/client`
+- a reference provider that delegates signing and submission to `@xian-tech/client`
 - browser injection and discovery helpers for `window.xian` and
   `window.xianProviders`
 - a dapp-facing wrapper around an injected provider

@@ -13,7 +13,7 @@ npm run validate
 Example client usage:
 
 ```ts
-import { Ed25519Signer, XianClient } from "@xian/client";
+import { Ed25519Signer, XianClient } from "@xian-tech/client";
 
 const signer = new Ed25519Signer();
 const client = new XianClient({
@@ -46,13 +46,13 @@ console.log(submission.txHash);
 
 ## Injected Wallets
 
-`@xian/provider` now includes the browser-side injection and discovery layer for
+`@xian-tech/provider` now includes the browser-side injection and discovery layer for
 real wallet integrations.
 
 Wallet-side registration:
 
 ```ts
-import { registerInjectedXianProvider } from "@xian/provider";
+import { registerInjectedXianProvider } from "@xian-tech/provider";
 
 registerInjectedXianProvider({
   provider,
@@ -68,7 +68,7 @@ registerInjectedXianProvider({
 Dapp-side discovery:
 
 ```ts
-import { InjectedXianWallet } from "@xian/provider";
+import { InjectedXianWallet } from "@xian-tech/provider";
 
 const wallet = await InjectedXianWallet.waitForInjected({ timeoutMs: 1_000 });
 const accounts = wallet ? await wallet.connect() : [];

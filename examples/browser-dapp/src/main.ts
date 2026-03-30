@@ -5,12 +5,12 @@ import {
   type WatchSubscription,
   type XianSignedTransaction,
   type XianUnsignedTransaction
-} from "@xian/client";
+} from "@xian-tech/client";
 import {
   InjectedXianWallet,
   InMemoryXianProvider,
   registerInjectedXianProvider
-} from "@xian/provider";
+} from "@xian-tech/provider";
 
 import "./style.css";
 
@@ -36,7 +36,7 @@ app.innerHTML = `
     <p class="muted">xian-js example</p>
     <h1>Browser dApp Playground</h1>
     <p>
-      This app uses <code>@xian/client</code> and <code>@xian/provider</code>
+      This app uses <code>@xian-tech/client</code> and <code>@xian-tech/provider</code>
       directly. Point it at a reachable Xian RPC and dashboard endpoint, then
       read state, preview transactions, sign messages, and watch live updates.
     </p>

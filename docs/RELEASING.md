@@ -14,7 +14,7 @@ That means:
 
 - the repo tag is `vX.Y.Z`
 - every publishable package in this repo must have version `X.Y.Z`
-- the current publishable packages are `@xian/client` and `@xian/provider`
+- the current publishable packages are `@xian-tech/client` and `@xian-tech/provider`
 
 This repo is not lockstepped with `xian-wallet-browser`.
 

@@ -1,4 +1,4 @@
-# @xian/client
+# @xian-tech/client
 
 This package owns the typed Xian client surface for JS / TS consumers.
 

@@ -16,7 +16,7 @@ const signer = {
   signMessage: vi.fn((message: string) => `sig:${message}`)
 };
 
-describe("@xian/provider", () => {
+describe("@xian-tech/provider", () => {
   it("connects, emits events, and returns accounts", async () => {
     const client: XianProviderClient = {
       getChainId: vi.fn(async () => "xian-local"),

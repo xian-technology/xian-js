@@ -14,7 +14,7 @@ function jsonResponse(value: Record<string, unknown>): Response {
   });
 }
 
-describe("@xian/client", () => {
+describe("@xian-tech/client", () => {
   it("reads chain id and nonce through RPC surfaces", async () => {
     const fetchFn = vi.fn(async (input: string | URL) => {
       const url = String(input);

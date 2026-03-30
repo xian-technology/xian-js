@@ -1,6 +1,6 @@
 # Tests
 
-This folder covers the public behavior of `@xian/client`.
+This folder covers the public behavior of `@xian-tech/client`.
 
 Current focus:
 

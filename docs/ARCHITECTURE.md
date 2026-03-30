@@ -4,9 +4,9 @@
 
 Current packages:
 
-- `@xian/client`: typed network access, tx helpers, signing primitives, and
+- `@xian-tech/client`: typed network access, tx helpers, signing primitives, and
   websocket subscriptions
-- `@xian/provider`: browser wallet provider contract, injected-wallet discovery
+- `@xian-tech/provider`: browser wallet provider contract, injected-wallet discovery
   helpers, and a simple reference implementation
 - `examples/browser-dapp`: a runnable browser-side integration example that
   exercises the public package surface
@@ -17,9 +17,9 @@ Companion repo:
 
 Dependency direction:
 
-- `@xian/client` must not depend on `@xian/provider`
-- `@xian/provider` may depend on `@xian/client` types and helpers
-- browser wallet implementations should consume `@xian/provider` rather than
+- `@xian-tech/client` must not depend on `@xian-tech/provider`
+- `@xian-tech/provider` may depend on `@xian-tech/client` types and helpers
+- browser wallet implementations should consume `@xian-tech/provider` rather than
   redefining the injected-provider contract locally
 
 Design boundaries:

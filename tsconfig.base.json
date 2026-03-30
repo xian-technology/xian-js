@@ -17,8 +17,8 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@xian/client": ["packages/client/src/index.ts"],
-      "@xian/provider": ["packages/provider/src/index.ts"]
+      "@xian-tech/client": ["packages/client/src/index.ts"],
+      "@xian-tech/provider": ["packages/provider/src/index.ts"]
     }
   }
 }

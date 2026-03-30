@@ -53,7 +53,7 @@ class FakeInjectionTarget extends EventTarget implements XianInjectionTarget {
   xianProviders?: unknown[];
 }
 
-describe("@xian/provider injected discovery", () => {
+describe("@xian-tech/provider injected discovery", () => {
   it("registers providers on the injection target and lists them", () => {
     const target = new FakeInjectionTarget();
     const provider = new InMemoryXianProvider({

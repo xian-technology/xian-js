@@ -1,5 +1,5 @@
 {
-  "name": "@xian/client",
+  "name": "@xian-tech/client",
   "version": "0.1.0",
   "description": "Typed Xian client, tx helpers, and Ed25519 signer",
   "repository": {

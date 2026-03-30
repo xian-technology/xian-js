@@ -8,7 +8,7 @@ import {
   verifyMessage
 } from "../src/index";
 
-describe("@xian/client encoding", () => {
+describe("@xian-tech/client encoding", () => {
   it("canonicalizes payloads with sorted keys", () => {
     const canonical = canonicalizeRuntime({
       stamps_supplied: 50000,
