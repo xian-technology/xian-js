@@ -367,6 +367,26 @@ export class XianClient {
     return base64ToUtf8(String(value));
   }
 
+  async getContractMethods(contract: string): Promise<string[]> {
+    const data = await this.abciQuery(`/contract_methods/${contract}`);
+    const value = asRecord(asRecord(data.result).response).value;
+    if (value == null || value === EMPTY_ABCI_VALUE) {
+      return [];
+    }
+    const decoded = JSON.parse(base64ToUtf8(String(value)));
+    if (Array.isArray(decoded)) {
+      return decoded.filter(
+        (v: unknown): v is string => typeof v === "string"
+      );
+    }
+    if (decoded != null && typeof decoded === "object" && Array.isArray(decoded.methods)) {
+      return (decoded.methods as unknown[]).filter(
+        (v: unknown): v is string => typeof v === "string"
+      );
+    }
+    return [];
+  }
+
   async simulate(request: SimulateRequest): Promise<Record<string, unknown>> {
     const payload = sortKeysDeep({
       contract: request.contract,
