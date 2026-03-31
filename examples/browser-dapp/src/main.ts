@@ -14,6 +14,8 @@ import {
 
 import "./style.css";
 
+/* ── Types ─────────────────────────────────────────────────── */
+
 interface AppState {
   client: XianClient;
   signer?: Ed25519Signer;
@@ -26,6 +28,8 @@ interface AppState {
   balanceSub?: WatchSubscription;
 }
 
+/* ── Mount ─────────────────────────────────────────────────── */
+
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) {
   throw new Error("expected #app root");
@@ -33,142 +37,188 @@ if (!app) {
 
 app.innerHTML = `
   <section class="hero">
-    <p class="muted">xian-js example</p>
-    <h1>Browser dApp Playground</h1>
+    <div class="hero-label">xian-js example</div>
+    <h1>dApp Playground</h1>
     <p>
-      This app uses <code>@xian-tech/client</code> and <code>@xian-tech/provider</code>
-      directly. Point it at a reachable Xian RPC and dashboard endpoint, then
-      read state, preview transactions, sign messages, and watch live updates.
+      Test <code>@xian-tech/client</code> and <code>@xian-tech/provider</code>
+      against a live Xian node. Connect, read state, sign messages, build
+      transactions, and watch live updates.
     </p>
   </section>
 
-  <section class="grid">
-    <article class="card stack">
-      <h2>1. Network & Signer</h2>
-      <label>RPC URL
-        <input id="rpc-url" value="http://127.0.0.1:26657" />
-      </label>
-      <label>Dashboard URL
-        <input id="dashboard-url" value="http://127.0.0.1:8080" />
-      </label>
-      <label>Chain ID (optional)
-        <input id="chain-id" placeholder="xian-local" />
-      </label>
-      <label>Private Key (optional)
-        <input id="private-key" placeholder="leave blank to generate a dev signer" />
-      </label>
-      <div class="row">
-        <button id="initialize">Initialize Client</button>
-        <button id="connect-provider" class="secondary">Connect Provider</button>
-        <button id="wallet-info" class="secondary">Wallet Info</button>
+  <div class="status-bar">
+    <div class="status-item">
+      <span class="label">Wallet</span>
+      <span class="value" id="wallet-output">none</span>
+    </div>
+    <div class="status-item">
+      <span class="label">Address</span>
+      <span class="value" id="address">not initialized</span>
+    </div>
+    <div class="status-item">
+      <span class="label">Chain</span>
+      <span class="value" id="chain-output">unknown</span>
+    </div>
+  </div>
+
+  <div class="sections">
+    <!-- 1. Setup -->
+    <article class="card">
+      <div class="card-head" data-toggle="setup">
+        <span class="card-title">Setup</span>
+        <span class="card-badge">Network & Signer</span>
       </div>
-      <div class="row">
-        <button id="inject-wallet" class="secondary">Inject Demo Wallet</button>
-        <button id="use-injected-wallet" class="secondary">Use Injected Wallet</button>
-        <button id="watch-currency" class="secondary">Watch Currency</button>
-      </div>
-      <div class="status">
-        <div><strong>Wallet:</strong> <span id="wallet-output" class="muted">none</span></div>
-        <div><strong>Address:</strong> <span id="address" class="muted">not initialized</span></div>
-        <div><strong>Chain:</strong> <span id="chain-output" class="muted">unknown</span></div>
+      <div class="card-body" id="setup-body">
+        <div class="field-row">
+          <label>RPC URL<input id="rpc-url" value="http://127.0.0.1:26657" /></label>
+          <label>Dashboard URL<input id="dashboard-url" value="http://127.0.0.1:8080" /></label>
+        </div>
+        <div class="field-row">
+          <label>Chain ID <span style="font-weight:400">(optional)</span><input id="chain-id" placeholder="leave blank to auto-detect" /></label>
+          <label>Private Key <span style="font-weight:400">(optional)</span><input id="private-key" placeholder="leave blank to generate" /></label>
+        </div>
+        <div class="btn-row">
+          <button class="primary" id="initialize">Initialize</button>
+          <button class="secondary" id="connect-provider">Connect</button>
+          <button class="secondary" id="wallet-info">Wallet Info</button>
+        </div>
+        <hr class="separator" />
+        <div class="btn-row">
+          <button class="secondary" id="inject-wallet">Inject Demo Wallet</button>
+          <button class="secondary" id="use-injected-wallet">Use Injected Wallet</button>
+          <button class="secondary" id="watch-currency">Watch Currency</button>
+        </div>
       </div>
     </article>
 
-    <article class="card stack">
-      <h2>2. Read Calls</h2>
-      <div class="row">
-        <button id="read-chain">Get Chain ID</button>
-        <button id="read-nonce">Get Nonce</button>
-        <button id="read-balance">Get Balance</button>
+    <!-- 2. Read -->
+    <article class="card">
+      <div class="card-head" data-toggle="read">
+        <span class="card-title">Read Calls</span>
+        <span class="card-badge">Chain State</span>
       </div>
-      <pre id="reads-output">No reads yet.</pre>
+      <div class="card-body" id="read-body">
+        <div class="btn-row">
+          <button class="primary" id="read-chain">Chain ID</button>
+          <button class="secondary" id="read-nonce">Nonce</button>
+          <button class="secondary" id="read-balance">Balance</button>
+        </div>
+        <pre id="reads-output">No reads yet.</pre>
+      </div>
     </article>
 
-    <article class="card stack">
-      <h2>3. Message Signing</h2>
-      <label>Message
-        <input id="message" value="hello from xian-js" />
-      </label>
-      <button id="sign-message">Sign Message Through Provider</button>
-      <pre id="message-output">No signature yet.</pre>
+    <!-- 3. Sign Message -->
+    <article class="card">
+      <div class="card-head" data-toggle="sign">
+        <span class="card-title">Message Signing</span>
+      </div>
+      <div class="card-body" id="sign-body">
+        <label>Message<input id="message" value="hello from xian-js" /></label>
+        <button class="primary" id="sign-message">Sign Message</button>
+        <pre id="message-output">No signature yet.</pre>
+      </div>
     </article>
 
-    <article class="card stack">
-      <h2>4. Transaction Builder</h2>
-      <div class="row">
-        <label>Contract
-          <input id="tx-contract" value="currency" />
-        </label>
-        <label>Function
-          <input id="tx-function" value="transfer" />
-        </label>
+    <!-- 4. Transactions -->
+    <article class="card">
+      <div class="card-head" data-toggle="tx">
+        <span class="card-title">Transaction Builder</span>
+        <span class="card-badge">Build &rarr; Sign &rarr; Send</span>
       </div>
-      <div class="row">
-        <label>Stamps
-          <input id="tx-stamps" value="50000" />
-        </label>
-        <label>Mode
-          <select id="tx-mode">
-            <option value="checktx">checktx</option>
-            <option value="async">async</option>
-            <option value="commit">commit</option>
-          </select>
-        </label>
+      <div class="card-body" id="tx-body">
+        <div class="field-row">
+          <label>Contract<input id="tx-contract" value="currency" /></label>
+          <label>Function<input id="tx-function" value="transfer" /></label>
+        </div>
+        <div class="field-row">
+          <label>Stamps<input id="tx-stamps" value="50000" /></label>
+          <label>Mode
+            <select id="tx-mode">
+              <option value="checktx">checktx</option>
+              <option value="async">async</option>
+              <option value="commit" selected>commit</option>
+            </select>
+          </label>
+        </div>
+        <label>Kwargs JSON<textarea id="tx-kwargs">{"to": "bob", "amount": 5}</textarea></label>
+        <div class="btn-row">
+          <button class="primary" id="build-tx">Prepare</button>
+          <button class="secondary" id="sign-tx">Sign</button>
+          <button class="primary" id="send-tx">Send Prepared</button>
+          <button class="secondary" id="send-call">Quick Send</button>
+        </div>
+        <pre id="tx-output">No transaction built yet.</pre>
       </div>
-      <label>Kwargs JSON
-        <textarea id="tx-kwargs">{"to":"bob","amount":5}</textarea>
-      </label>
-      <div class="row">
-        <button id="build-tx">Prepare</button>
-        <button id="sign-tx" class="secondary">Sign</button>
-        <button id="send-tx">Send Prepared</button>
-        <button id="send-call" class="secondary">Quick Send</button>
-      </div>
-      <pre id="tx-output">No transaction built yet.</pre>
     </article>
 
-    <article class="card stack">
-      <h2>5. Live Subscriptions</h2>
-      <div class="row">
-        <button id="watch-blocks">Watch Blocks</button>
-        <button id="watch-balance" class="secondary">Watch Balance</button>
-        <button id="clear-watchers" class="secondary">Clear Watchers</button>
+    <!-- 5. Live -->
+    <article class="card">
+      <div class="card-head" data-toggle="live">
+        <span class="card-title">Live Subscriptions</span>
       </div>
-      <p class="muted">
-        Balance subscriptions watch <code>currency.balances:&lt;your address&gt;</code>
-        over the dashboard websocket.
-      </p>
+      <div class="card-body" id="live-body">
+        <p class="hint">
+          Watch real-time block production and balance state changes
+          via the dashboard WebSocket.
+        </p>
+        <div class="btn-row">
+          <button class="primary" id="watch-blocks">Watch Blocks</button>
+          <button class="secondary" id="watch-balance">Watch Balance</button>
+          <button class="danger" id="clear-watchers">Clear All</button>
+        </div>
+      </div>
     </article>
 
-    <article class="card stack">
-      <h2>Activity Log</h2>
-      <pre id="log-output" class="log">Ready.</pre>
+    <!-- 6. Log -->
+    <article class="card">
+      <div class="card-head" data-toggle="log">
+        <span class="card-title">Activity Log</span>
+      </div>
+      <div class="card-body" id="log-body">
+        <pre id="log-output" class="log">Ready.</pre>
+      </div>
     </article>
-  </section>
+  </div>
 `;
+
+/* ── State ─────────────────────────────────────────────────── */
 
 let state: AppState | null = null;
 const observedProviders = new WeakSet<object>();
 
-const rpcUrlInput = query<HTMLInputElement>("#rpc-url");
-const dashboardUrlInput = query<HTMLInputElement>("#dashboard-url");
-const chainIdInput = query<HTMLInputElement>("#chain-id");
-const privateKeyInput = query<HTMLInputElement>("#private-key");
-const messageInput = query<HTMLInputElement>("#message");
-const txContractInput = query<HTMLInputElement>("#tx-contract");
-const txFunctionInput = query<HTMLInputElement>("#tx-function");
-const txStampsInput = query<HTMLInputElement>("#tx-stamps");
-const txModeSelect = query<HTMLSelectElement>("#tx-mode");
-const txKwargsInput = query<HTMLTextAreaElement>("#tx-kwargs");
-const addressOutput = query<HTMLElement>("#address");
-const chainOutput = query<HTMLElement>("#chain-output");
-const readsOutput = query<HTMLElement>("#reads-output");
-const messageOutput = query<HTMLElement>("#message-output");
-const txOutput = query<HTMLElement>("#tx-output");
-const logOutput = query<HTMLElement>("#log-output");
-const walletOutput = query<HTMLElement>("#wallet-output");
+/* ── DOM refs ──────────────────────────────────────────────── */
 
-query<HTMLButtonElement>("#initialize").addEventListener("click", async () => {
+const rpcUrlInput = q<HTMLInputElement>("#rpc-url");
+const dashboardUrlInput = q<HTMLInputElement>("#dashboard-url");
+const chainIdInput = q<HTMLInputElement>("#chain-id");
+const privateKeyInput = q<HTMLInputElement>("#private-key");
+const messageInput = q<HTMLInputElement>("#message");
+const txContractInput = q<HTMLInputElement>("#tx-contract");
+const txFunctionInput = q<HTMLInputElement>("#tx-function");
+const txStampsInput = q<HTMLInputElement>("#tx-stamps");
+const txModeSelect = q<HTMLSelectElement>("#tx-mode");
+const txKwargsInput = q<HTMLTextAreaElement>("#tx-kwargs");
+const addressOutput = q<HTMLElement>("#address");
+const chainOutput = q<HTMLElement>("#chain-output");
+const readsOutput = q<HTMLElement>("#reads-output");
+const messageOutput = q<HTMLElement>("#message-output");
+const txOutput = q<HTMLElement>("#tx-output");
+const logOutput = q<HTMLElement>("#log-output");
+const walletOutput = q<HTMLElement>("#wallet-output");
+
+/* ── Card toggle (collapse / expand) ──────────────────────── */
+
+for (const head of app.querySelectorAll<HTMLElement>("[data-toggle]")) {
+  head.addEventListener("click", () => {
+    const id = head.dataset.toggle;
+    const body = app.querySelector<HTMLElement>(`#${id}-body`);
+    body?.classList.toggle("collapsed");
+  });
+}
+
+/* ── 1. Setup ──────────────────────────────────────────────── */
+
+q<HTMLButtonElement>("#initialize").addEventListener("click", async () => {
   try {
     clearWatchers();
     const signer = new Ed25519Signer(privateKeyInput.value.trim() || undefined);
@@ -192,97 +242,80 @@ query<HTMLButtonElement>("#initialize").addEventListener("click", async () => {
 
     attachWalletListeners(wallet);
 
-    state = {
-      client,
-      signer,
-      provider,
-      wallet,
-      address: signer.address
-    };
+    state = { client, signer, provider, wallet, address: signer.address };
     walletOutput.textContent = wallet.metadata?.name ?? "demo wallet";
     addressOutput.textContent = signer.address;
     chainOutput.textContent = chainIdInput.value.trim() || "lazy";
     readsOutput.textContent = "Client initialized.";
     messageOutput.textContent = "No signature yet.";
     txOutput.textContent = "No transaction built yet.";
-    appendLog("initialized client and demo wallet");
+    log("initialized client and demo wallet");
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#connect-provider").addEventListener("click", async () => {
+q<HTMLButtonElement>("#connect-provider").addEventListener("click", async () => {
   try {
-    const current = ensureState();
-    const accounts = await current.wallet.connect();
-    current.address = accounts[0];
-    addressOutput.textContent = current.address ?? "none";
-    chainOutput.textContent = await current.wallet.getChainId();
-    appendLog(`provider connected ${JSON.stringify(accounts)}`);
+    const s = need();
+    const accounts = await s.wallet.connect();
+    s.address = accounts[0];
+    addressOutput.textContent = s.address ?? "none";
+    chainOutput.textContent = await s.wallet.getChainId();
+    log(`provider connected ${JSON.stringify(accounts)}`);
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#wallet-info").addEventListener("click", async () => {
+q<HTMLButtonElement>("#wallet-info").addEventListener("click", async () => {
   try {
-    const current = ensureState();
-    const walletInfo = await current.wallet.getWalletInfo();
-    readsOutput.textContent = JSON.stringify(walletInfo, null, 2);
-    appendLog("read wallet info");
+    const s = need();
+    const info = await s.wallet.getWalletInfo();
+    readsOutput.textContent = JSON.stringify(info, null, 2);
+    log("read wallet info");
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#inject-wallet").addEventListener("click", () => {
+q<HTMLButtonElement>("#inject-wallet").addEventListener("click", () => {
   try {
-    const current = ensureState();
-    if (!current.provider) {
+    const s = need();
+    if (!s.provider) {
       throw new Error("initialize the demo wallet first");
     }
     const record = registerInjectedXianProvider({
-      provider: current.provider,
+      provider: s.provider,
       metadata: {
         id: "xian-js-demo",
         name: "Xian JS Demo Wallet",
         rdns: "local.xian-js.demo"
       }
     });
-    appendLog(`injected wallet ${record.metadata.name} into window`);
+    log(`injected wallet ${record.metadata.name} into window`);
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#watch-currency").addEventListener("click", async () => {
+q<HTMLButtonElement>("#use-injected-wallet").addEventListener("click", async () => {
   try {
-    const current = ensureState();
-    const accepted = await current.wallet.watchAsset({
-      type: "token",
-      options: {
-        contract: "currency",
-        symbol: "XIAN",
-        name: "Xian"
-      }
-    });
-    appendLog(
-      accepted
-        ? "wallet accepted currency asset watch request"
-        : "wallet rejected currency asset watch request"
-    );
-  } catch (error) {
-    appendLog(formatError(error));
-  }
-});
-
-query<HTMLButtonElement>("#use-injected-wallet").addEventListener("click", async () => {
-  try {
-    const current = ensureState();
     const injected = InjectedXianWallet.getInjected();
     if (!injected) {
       throw new Error("no injected Xian wallet found on window");
     }
+    const current =
+      state ??
+      ({
+        client: new XianClient({
+          rpcUrl: rpcUrlInput.value.trim(),
+          dashboardUrl: dashboardUrlInput.value.trim() || undefined,
+          chainId: chainIdInput.value.trim() || undefined
+        }),
+        wallet: injected
+      } satisfies AppState);
+    state = current;
     attachWalletListeners(injected);
     current.wallet = injected;
     const accounts = await injected.connect();
@@ -290,118 +323,138 @@ query<HTMLButtonElement>("#use-injected-wallet").addEventListener("click", async
     walletOutput.textContent = injected.metadata?.name ?? "injected wallet";
     addressOutput.textContent = current.address ?? "none";
     chainOutput.textContent = await injected.getChainId();
-    appendLog(`using injected wallet ${injected.metadata?.name ?? "unknown"}`);
+    log(`using injected wallet ${injected.metadata?.name ?? "unknown"}`);
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#read-chain").addEventListener("click", async () => {
+q<HTMLButtonElement>("#watch-currency").addEventListener("click", async () => {
   try {
-    const current = ensureState();
-    const chainId = await current.client.getChainId();
+    const s = need();
+    const accepted = await s.wallet.watchAsset({
+      type: "token",
+      options: { contract: "currency", symbol: "XIAN", name: "Xian" }
+    });
+    log(
+      accepted
+        ? "wallet accepted currency asset watch request"
+        : "wallet rejected currency asset watch request"
+    );
+  } catch (error) {
+    log(fmtError(error));
+  }
+});
+
+/* ── 2. Read Calls ─────────────────────────────────────────── */
+
+q<HTMLButtonElement>("#read-chain").addEventListener("click", async () => {
+  try {
+    const s = need();
+    const chainId = await s.client.getChainId();
     chainOutput.textContent = chainId;
     readsOutput.textContent = JSON.stringify({ chainId }, null, 2);
-    appendLog(`chain id ${chainId}`);
+    log(`chain id ${chainId}`);
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#read-nonce").addEventListener("click", async () => {
+q<HTMLButtonElement>("#read-nonce").addEventListener("click", async () => {
   try {
-    const current = ensureState();
-    const address = await ensureAddress(current);
-    const nonce = await current.client.getNonce(address);
+    const s = need();
+    const address = await addr(s);
+    const nonce = await s.client.getNonce(address);
     readsOutput.textContent = JSON.stringify({ nonce }, null, 2);
-    appendLog(`nonce ${String(nonce)}`);
+    log(`nonce ${String(nonce)}`);
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#read-balance").addEventListener("click", async () => {
+q<HTMLButtonElement>("#read-balance").addEventListener("click", async () => {
   try {
-    const current = ensureState();
-    const address = await ensureAddress(current);
-    const balance = await current.client.getBalance(address);
+    const s = need();
+    const address = await addr(s);
+    const balance = await s.client.getBalance(address);
     readsOutput.textContent = JSON.stringify({ balance }, null, 2);
-    appendLog(`balance ${JSON.stringify(balance)}`);
+    log(`balance ${JSON.stringify(balance)}`);
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#sign-message").addEventListener("click", async () => {
+/* ── 3. Message Signing ────────────────────────────────────── */
+
+q<HTMLButtonElement>("#sign-message").addEventListener("click", async () => {
   try {
-    const current = ensureState();
-    const signature = await current.wallet.signMessage(messageInput.value);
+    const s = need();
+    const signature = await s.wallet.signMessage(messageInput.value);
     messageOutput.textContent = JSON.stringify({ signature }, null, 2);
-    appendLog("signed message through provider");
+    log("signed message through provider");
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#build-tx").addEventListener("click", async () => {
+/* ── 4. Transaction Builder ────────────────────────────────── */
+
+q<HTMLButtonElement>("#build-tx").addEventListener("click", async () => {
   try {
-    const current = ensureState();
+    const s = need();
     const kwargs = JSON.parse(txKwargsInput.value) as Record<string, unknown>;
     const parsedStamps = Number.parseInt(txStampsInput.value, 10);
-    current.unsignedTx = await current.wallet.prepareTransaction({
+    s.unsignedTx = await s.wallet.prepareTransaction({
       contract: txContractInput.value.trim(),
       function: txFunctionInput.value.trim(),
       kwargs,
       stamps: Number.isNaN(parsedStamps) ? undefined : parsedStamps
     });
-    current.signedTx = undefined;
-    txOutput.textContent = JSON.stringify(current.unsignedTx, null, 2);
-    appendLog("prepared unsigned transaction through wallet");
+    s.signedTx = undefined;
+    txOutput.textContent = JSON.stringify(s.unsignedTx, null, 2);
+    log("prepared unsigned transaction");
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#sign-tx").addEventListener("click", async () => {
+q<HTMLButtonElement>("#sign-tx").addEventListener("click", async () => {
   try {
-    const current = ensureState();
-    if (!current.unsignedTx) {
-      throw new Error("build a transaction first");
+    const s = need();
+    if (!s.unsignedTx) {
+      throw new Error("prepare a transaction first");
     }
-    current.signedTx = await current.wallet.signTransaction(current.unsignedTx);
-    txOutput.textContent = JSON.stringify(current.signedTx, null, 2);
-    appendLog("signed transaction");
+    s.signedTx = await s.wallet.signTransaction(s.unsignedTx);
+    txOutput.textContent = JSON.stringify(s.signedTx, null, 2);
+    log("signed transaction");
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#send-tx").addEventListener("click", async () => {
+q<HTMLButtonElement>("#send-tx").addEventListener("click", async () => {
   try {
-    const current = ensureState();
-    if (!current.unsignedTx) {
-      throw new Error("build a transaction first");
+    const s = need();
+    if (!s.unsignedTx) {
+      throw new Error("prepare a transaction first");
     }
-    const submission = (await current.wallet.sendTransaction(
-      current.unsignedTx,
-      {
-        mode: txModeSelect.value as "async" | "checktx" | "commit",
-        waitForTx: txModeSelect.value !== "async"
-      }
-    )) as TransactionSubmission;
+    const submission = (await s.wallet.sendTransaction(s.unsignedTx, {
+      mode: txModeSelect.value as "async" | "checktx" | "commit",
+      waitForTx: txModeSelect.value !== "async"
+    })) as TransactionSubmission;
     txOutput.textContent = JSON.stringify(submission, null, 2);
-    appendLog(`sent transaction ${submission.txHash ?? "(no hash)"}`);
+    log(`sent transaction ${submission.txHash ?? "(no hash)"}`);
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#send-call").addEventListener("click", async () => {
+q<HTMLButtonElement>("#send-call").addEventListener("click", async () => {
   try {
-    const current = ensureState();
+    const s = need();
     const kwargs = JSON.parse(txKwargsInput.value) as Record<string, unknown>;
     const parsedStamps = Number.parseInt(txStampsInput.value, 10);
-    const submission = await current.wallet.sendCall(
+    const submission = await s.wallet.sendCall(
       {
         contract: txContractInput.value.trim(),
         function: txFunctionInput.value.trim(),
@@ -414,60 +467,64 @@ query<HTMLButtonElement>("#send-call").addEventListener("click", async () => {
       }
     );
     txOutput.textContent = JSON.stringify(submission, null, 2);
-    appendLog(`sent intent-based call ${submission.txHash ?? "(no hash)"}`);
+    log(`sent intent-based call ${submission.txHash ?? "(no hash)"}`);
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#watch-blocks").addEventListener("click", () => {
+/* ── 5. Live Subscriptions ─────────────────────────────────── */
+
+q<HTMLButtonElement>("#watch-blocks").addEventListener("click", () => {
   try {
-    const current = ensureState();
-    current.blockSub?.unsubscribe();
-    current.blockSub = current.client.watch.blocks((message) => {
-      appendLog(`block ${String(message.height ?? "?")} ${String(message.hash ?? "")}`);
+    const s = need();
+    s.blockSub?.unsubscribe();
+    s.blockSub = s.client.watch.blocks((message) => {
+      log(`block ${String(message.height ?? "?")} ${String(message.hash ?? "")}`);
     });
-    appendLog("watching new_block stream");
+    log("watching new_block stream");
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#watch-balance").addEventListener("click", async () => {
+q<HTMLButtonElement>("#watch-balance").addEventListener("click", async () => {
   try {
-    const current = ensureState();
-    const address = await ensureAddress(current);
-    current.balanceSub?.unsubscribe();
-    current.balanceSub = current.client.watch.state(
+    const s = need();
+    const address = await addr(s);
+    s.balanceSub?.unsubscribe();
+    s.balanceSub = s.client.watch.state(
       `currency.balances:${address}`,
       (message) => {
-        appendLog(`balance update ${message.key} => ${JSON.stringify(message.value)}`);
+        log(`balance update ${message.key} => ${JSON.stringify(message.value)}`);
       }
     );
-    appendLog("watching balance state");
+    log("watching balance state");
   } catch (error) {
-    appendLog(formatError(error));
+    log(fmtError(error));
   }
 });
 
-query<HTMLButtonElement>("#clear-watchers").addEventListener("click", () => {
+q<HTMLButtonElement>("#clear-watchers").addEventListener("click", () => {
   clearWatchers();
-  appendLog("cleared subscriptions");
+  log("cleared subscriptions");
 });
 
-function ensureState(): AppState {
+/* ── Helpers ───────────────────────────────────────────────── */
+
+function need(): AppState {
   if (!state) {
     throw new Error("initialize the client first");
   }
   return state;
 }
 
-async function ensureAddress(current: AppState): Promise<string> {
-  if (current.address) {
-    return current.address;
+async function addr(s: AppState): Promise<string> {
+  if (s.address) {
+    return s.address;
   }
-  const [account] = await current.wallet.connect();
-  current.address = account;
+  const [account] = await s.wallet.connect();
+  s.address = account;
   addressOutput.textContent = account ?? "none";
   return account ?? "";
 }
@@ -482,45 +539,41 @@ function clearWatchers(): void {
 }
 
 function attachWalletListeners(wallet: InjectedXianWallet): void {
-  const providerRef = wallet.provider as object;
-  if (observedProviders.has(providerRef)) {
+  const ref = wallet.provider as object;
+  if (observedProviders.has(ref)) {
     return;
   }
-  observedProviders.add(providerRef);
+  observedProviders.add(ref);
 
-  wallet.on("connect", (event) =>
-    appendLog(`provider connect ${JSON.stringify(event)}`)
-  );
-  wallet.on("disconnect", (event) =>
-    appendLog(`provider disconnect ${JSON.stringify(event)}`)
-  );
+  wallet.on("connect", (event) => log(`connect ${JSON.stringify(event)}`));
+  wallet.on("disconnect", (event) => log(`disconnect ${JSON.stringify(event)}`));
   wallet.on("accountsChanged", (accounts) => {
-    appendLog(`accountsChanged ${JSON.stringify(accounts)}`);
+    log(`accountsChanged ${JSON.stringify(accounts)}`);
     if (state) {
       state.address = Array.isArray(accounts) ? (accounts[0] as string | undefined) : undefined;
       addressOutput.textContent = state.address ?? "none";
     }
   });
   wallet.on("chainChanged", (chainId) => {
-    appendLog(`chainChanged ${String(chainId)}`);
+    log(`chainChanged ${String(chainId)}`);
     chainOutput.textContent = String(chainId);
   });
 }
 
-function query<TElement extends Element>(selector: string): TElement {
-  const element = app?.querySelector<TElement>(selector);
-  if (!element) {
+function q<T extends Element>(selector: string): T {
+  const el = app?.querySelector<T>(selector);
+  if (!el) {
     throw new Error(`missing element ${selector}`);
   }
-  return element;
+  return el;
 }
 
-function appendLog(message: string): void {
-  const prefix = new Date().toLocaleTimeString();
-  logOutput.textContent = `${prefix} ${message}\n${logOutput.textContent}`;
+function log(message: string): void {
+  const ts = new Date().toLocaleTimeString();
+  logOutput.textContent = `${ts}  ${message}\n${logOutput.textContent}`;
 }
 
-function formatError(error: unknown): string {
+function fmtError(error: unknown): string {
   if (error instanceof Error) {
     return `${error.name}: ${error.message}`;
   }

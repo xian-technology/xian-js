@@ -1,12 +1,21 @@
+/* ────────────────────────────────────────────────────────────
+   Xian JS – Browser dApp Playground
+   ──────────────────────────────────────────────────────────── */
+
 :root {
-  color-scheme: light;
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-  line-height: 1.4;
-  color: #13233a;
-  background:
-    radial-gradient(circle at top left, rgba(97, 152, 255, 0.18), transparent 30%),
-    radial-gradient(circle at right center, rgba(22, 184, 146, 0.14), transparent 28%),
-    linear-gradient(180deg, #f7fbff 0%, #eef4fb 100%);
+  color-scheme: dark;
+  --bg: #0a0a0a;
+  --surface: #111111;
+  --surface-2: #1a1a1a;
+  --line: rgba(255, 255, 255, 0.06);
+  --text: #f0f0f0;
+  --text-2: #999999;
+  --accent: #adff2f;
+  --accent-soft: rgba(173, 255, 47, 0.08);
+  --danger: #ff4d4f;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius: 12px;
 }
 
 * {
@@ -16,141 +25,298 @@
 body {
   margin: 0;
   min-height: 100vh;
+  background: var(--bg);
+  font-family: var(--font);
+  color: var(--text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 #app {
-  max-width: 1200px;
+  max-width: 880px;
   margin: 0 auto;
-  padding: 32px 20px 48px;
+  padding: 32px 20px 64px;
 }
 
+/* ── Hero ── */
+
 .hero {
-  display: grid;
-  gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
+}
+
+.hero-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  margin-bottom: 8px;
 }
 
 .hero h1 {
   margin: 0;
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  line-height: 1;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 
 .hero p {
-  margin: 0;
-  max-width: 760px;
-  color: #35506f;
+  margin: 8px 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+  max-width: 640px;
 }
 
-.grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+.hero code {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
 }
+
+/* ── Status Bar ── */
+
+.status-bar {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 24px;
+  font-size: 13px;
+}
+
+.status-item {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.status-item .label {
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.status-item .value {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Layout ── */
+
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Cards ── */
 
 .card {
-  background: rgba(255, 255, 255, 0.86);
-  border: 1px solid rgba(19, 35, 58, 0.08);
-  border-radius: 18px;
-  padding: 18px;
-  box-shadow: 0 16px 48px rgba(19, 35, 58, 0.08);
-  backdrop-filter: blur(8px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 
-.card h2 {
-  margin-top: 0;
-  margin-bottom: 14px;
-  font-size: 1.1rem;
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  user-select: none;
 }
 
-.stack {
+.card-head:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.card-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.card-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card-body.collapsed {
+  display: none;
+}
+
+/* ── Forms ── */
+
+.field-row {
   display: grid;
   gap: 10px;
-}
-
-.row {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 label {
-  display: grid;
-  gap: 6px;
-  font-size: 0.9rem;
-  color: #35506f;
-}
-
-input,
-textarea,
-select,
-button {
-  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
 }
 
 input,
 textarea,
 select {
   width: 100%;
-  border: 1px solid rgba(19, 35, 58, 0.16);
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 13px/1.4 var(--font);
+  transition: border-color 120ms;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: rgba(173, 255, 47, 0.3);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #555;
 }
 
 textarea {
-  min-height: 140px;
+  min-height: 80px;
   resize: vertical;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* ── Buttons ── */
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 button {
   border: 0;
-  border-radius: 999px;
-  padding: 10px 14px;
-  background: linear-gradient(135deg, #2346b6, #1788cb);
-  color: white;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font: 600 13px/1 var(--font);
   cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease;
-  box-shadow: 0 10px 22px rgba(35, 70, 182, 0.18);
+  transition: background 120ms, opacity 120ms;
+  white-space: nowrap;
 }
 
-button:hover {
-  transform: translateY(-1px);
+button.primary {
+  background: var(--accent);
+  color: #000;
+}
+
+button.primary:hover {
+  background: #8bff00;
 }
 
 button.secondary {
-  background: white;
-  color: #2346b6;
-  border: 1px solid rgba(35, 70, 182, 0.18);
-  box-shadow: none;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line);
 }
+
+button.secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+button.danger {
+  background: rgba(255, 77, 79, 0.1);
+  color: var(--danger);
+  border: 1px solid rgba(255, 77, 79, 0.15);
+}
+
+button.danger:hover {
+  background: rgba(255, 77, 79, 0.18);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Output ── */
 
 pre {
   margin: 0;
-  padding: 14px;
-  border-radius: 12px;
-  background: #0f1724;
-  color: #dbe7ff;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
   overflow: auto;
-  min-height: 120px;
+  max-height: 240px;
+  border: 1px solid var(--line);
 }
 
-.muted {
-  color: #56718f;
+pre.log {
+  max-height: 320px;
+  color: var(--text-2);
 }
 
-.status {
-  display: grid;
-  gap: 6px;
-  font-size: 0.95rem;
+.hint {
+  font-size: 12px;
+  color: var(--text-2);
+  margin: 0;
 }
 
-.log {
-  min-height: 220px;
+.separator {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 4px 0;
 }
 
-@media (max-width: 720px) {
+/* ── Responsive ── */
+
+@media (max-width: 600px) {
   #app {
-    padding: 24px 14px 32px;
+    padding: 20px 14px 48px;
+  }
+
+  .hero h1 {
+    font-size: 22px;
+  }
+
+  .status-bar {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .field-row {
+    grid-template-columns: 1fr;
   }
 }
