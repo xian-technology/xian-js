@@ -78,15 +78,15 @@ app.innerHTML = `
           <label>Private Key <span style="font-weight:400">(optional)</span><input id="private-key" placeholder="leave blank to generate" /></label>
         </div>
         <div class="btn-row">
-          <button class="primary" id="initialize" title="Create an in-memory signer and XianClient from the fields above">Initialize</button>
-          <button class="secondary" id="connect-provider" title="Call wallet.connect() to request account access from the provider">Connect</button>
-          <button class="secondary" id="wallet-info" title="Fetch wallet metadata (name, version, capabilities)">Wallet Info</button>
+          <button class="primary" id="initialize" data-tip="Create an in-memory signer and XianClient from the fields above">Initialize</button>
+          <button class="secondary" id="connect-provider" data-tip="Call wallet.connect() to request account access from the provider">Connect</button>
+          <button class="secondary" id="wallet-info" data-tip="Fetch wallet metadata (name, version, capabilities)">Wallet Info</button>
         </div>
         <hr class="separator" />
         <div class="btn-row">
-          <button class="secondary" id="inject-wallet" title="Register the demo provider into window.xian so other tabs can discover it">Inject Demo Wallet</button>
-          <button class="secondary" id="use-injected-wallet" title="Detect and connect to a wallet already injected by a browser extension">Use Injected Wallet</button>
-          <button class="secondary" id="watch-currency" title="Ask the wallet to track the native XIAN currency token">Watch Currency</button>
+          <button class="secondary" id="inject-wallet" data-tip="Register the demo provider into window.xian so other tabs can discover it">Inject Demo Wallet</button>
+          <button class="secondary" id="use-injected-wallet" data-tip="Detect and connect to a wallet already injected by a browser extension">Use Injected Wallet</button>
+          <button class="secondary" id="watch-currency" data-tip="Ask the wallet to track the native XIAN currency token">Watch Currency</button>
         </div>
       </div>
     </article>
@@ -99,9 +99,9 @@ app.innerHTML = `
       </div>
       <div class="card-body" id="read-body">
         <div class="btn-row">
-          <button class="primary" id="read-chain" title="Query the connected chain identifier from the RPC node">Chain ID</button>
-          <button class="secondary" id="read-nonce" title="Get the next transaction nonce for your address">Nonce</button>
-          <button class="secondary" id="read-balance" title="Read the native currency balance for your address">Balance</button>
+          <button class="primary" id="read-chain" data-tip="Query the connected chain identifier from the RPC node">Chain ID</button>
+          <button class="secondary" id="read-nonce" data-tip="Get the next transaction nonce for your address">Nonce</button>
+          <button class="secondary" id="read-balance" data-tip="Read the native currency balance for your address">Balance</button>
         </div>
         <pre id="reads-output">No reads yet.</pre>
       </div>
@@ -114,7 +114,7 @@ app.innerHTML = `
       </div>
       <div class="card-body" id="sign-body">
         <label>Message<input id="message" value="hello from xian-js" /></label>
-        <button class="primary" id="sign-message" title="Sign the message text using the wallet provider and return the signature">Sign Message</button>
+        <button class="primary" id="sign-message" data-tip="Sign the message text using the wallet provider and return the signature">Sign Message</button>
         <pre id="message-output">No signature yet.</pre>
       </div>
     </article>
@@ -142,10 +142,10 @@ app.innerHTML = `
         </div>
         <label>Kwargs JSON<textarea id="tx-kwargs">{"to": "bob", "amount": 5}</textarea></label>
         <div class="btn-row">
-          <button class="primary" id="build-tx" title="Build an unsigned transaction from the fields above (fetches nonce and estimates stamps)">Prepare</button>
-          <button class="secondary" id="sign-tx" title="Sign the previously prepared unsigned transaction">Sign</button>
-          <button class="primary" id="send-tx" title="Sign and broadcast the prepared transaction to the network">Send Prepared</button>
-          <button class="secondary" id="send-call" title="Prepare, sign, and broadcast in one step (intent-based call)">Quick Send</button>
+          <button class="primary" id="build-tx" data-tip="Build an unsigned transaction from the fields above (fetches nonce and estimates stamps)">Prepare</button>
+          <button class="secondary" id="sign-tx" data-tip="Sign the previously prepared unsigned transaction">Sign</button>
+          <button class="primary" id="send-tx" data-tip="Sign and broadcast the prepared transaction to the network">Send Prepared</button>
+          <button class="secondary" id="send-call" data-tip="Prepare, sign, and broadcast in one step (intent-based call)">Quick Send</button>
         </div>
         <pre id="tx-output">No transaction built yet.</pre>
       </div>
@@ -162,9 +162,9 @@ app.innerHTML = `
           via the dashboard WebSocket.
         </p>
         <div class="btn-row">
-          <button class="primary" id="watch-blocks" title="Subscribe to new blocks via the dashboard WebSocket">Watch Blocks</button>
-          <button class="secondary" id="watch-balance" title="Subscribe to real-time balance changes for your address">Watch Balance</button>
-          <button class="danger" id="clear-watchers" title="Unsubscribe from all active block and balance watchers">Clear All</button>
+          <button class="primary" id="watch-blocks" data-tip="Subscribe to new blocks via the dashboard WebSocket">Watch Blocks</button>
+          <button class="secondary" id="watch-balance" data-tip="Subscribe to real-time balance changes for your address">Watch Balance</button>
+          <button class="danger" id="clear-watchers" data-tip="Unsubscribe from all active block and balance watchers">Clear All</button>
         </div>
       </div>
     </article>

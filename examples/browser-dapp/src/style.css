@@ -300,6 +300,55 @@ pre.log {
   margin: 4px 0;
 }
 
+/* ── Tooltips ── */
+
+[data-tip] {
+  position: relative;
+}
+
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.95);
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #222;
+  color: #ddd;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: normal;
+  width: max-content;
+  max-width: 240px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 100ms, transform 100ms;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+[data-tip]::before {
+  content: "";
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.95);
+  border: 5px solid transparent;
+  border-top-color: #222;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 100ms, transform 100ms;
+  z-index: 100;
+}
+
+[data-tip]:hover::after,
+[data-tip]:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 600px) {
