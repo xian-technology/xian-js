@@ -367,24 +367,41 @@ export class XianClient {
     return base64ToUtf8(String(value));
   }
 
-  async getContractMethods(contract: string): Promise<string[]> {
+  async getContractMethods(
+    contract: string
+  ): Promise<{ name: string; arguments: { name: string; type: string }[] }[]> {
     const data = await this.abciQuery(`/contract_methods/${contract}`);
     const value = asRecord(asRecord(data.result).response).value;
     if (value == null || value === EMPTY_ABCI_VALUE) {
       return [];
     }
     const decoded = JSON.parse(base64ToUtf8(String(value)));
-    if (Array.isArray(decoded)) {
-      return decoded.filter(
-        (v: unknown): v is string => typeof v === "string"
-      );
-    }
-    if (decoded != null && typeof decoded === "object" && Array.isArray(decoded.methods)) {
-      return (decoded.methods as unknown[]).filter(
-        (v: unknown): v is string => typeof v === "string"
-      );
-    }
-    return [];
+    const raw: unknown[] = Array.isArray(decoded)
+      ? decoded
+      : decoded != null &&
+          typeof decoded === "object" &&
+          Array.isArray((decoded as Record<string, unknown>).methods)
+        ? (decoded as Record<string, unknown>).methods as unknown[]
+        : [];
+    return raw
+      .filter(
+        (v): v is { name: string; arguments?: unknown[] } =>
+          v != null && typeof v === "object" && typeof (v as Record<string, unknown>).name === "string"
+      )
+      .map((m) => ({
+        name: m.name,
+        arguments: Array.isArray(m.arguments)
+          ? m.arguments
+              .filter(
+                (a: unknown): a is { name: string; type: string } =>
+                  a != null &&
+                  typeof a === "object" &&
+                  typeof (a as Record<string, unknown>).name === "string" &&
+                  typeof (a as Record<string, unknown>).type === "string"
+              )
+              .map((a) => ({ name: a.name, type: a.type }))
+          : []
+      }));
   }
 
   async simulate(request: SimulateRequest): Promise<Record<string, unknown>> {
