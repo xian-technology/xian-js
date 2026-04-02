@@ -237,6 +237,71 @@ describe("@xian-tech/client", () => {
     await expect(client.getStampRate()).resolves.toBe(25);
   });
 
+  it("reads indexed token balances through the BDS portfolio query", async () => {
+    const fetchFn = vi.fn(async (input: string | URL) => {
+      const url = new URL(String(input));
+      const path = decodeURIComponent(url.searchParams.get("path") ?? "");
+      if (url.pathname.endsWith("/abci_query") && path.includes("/token_balances/")) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8(
+                JSON.stringify({
+                  available: true,
+                  address: "alice",
+                  items: [
+                    {
+                      contract: "currency",
+                      balance: "12.5",
+                      name: "Xian",
+                      symbol: "XIAN",
+                      logo_url: "https://example.com/xian.svg",
+                      last_tx_hash: "TX-1",
+                      last_block_height: 12,
+                      updated_at: "2026-04-02T12:00:00Z"
+                    }
+                  ],
+                  total: 1,
+                  limit: 50,
+                  offset: 10
+                })
+              )
+            }
+          }
+        });
+      }
+      throw new Error(`unexpected URL: ${String(input)}`);
+    }) as typeof fetch;
+
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn
+    });
+
+    await expect(
+      client.getTokenBalances("alice", { limit: 50, offset: 10, includeZero: true })
+    ).resolves.toEqual({
+      available: true,
+      address: "alice",
+      items: [
+        {
+          contract: "currency",
+          balance: "12.5",
+          name: "Xian",
+          symbol: "XIAN",
+          logoUrl: "https://example.com/xian.svg",
+          lastTxHash: "TX-1",
+          lastBlockHeight: 12,
+          updatedAt: "2026-04-02T12:00:00Z"
+        }
+      ],
+      total: 1,
+      limit: 50,
+      offset: 10
+    });
+  });
+
   it("waits until a transaction lookup stops returning a pending error", async () => {
     let attempts = 0;
     const fetchFn = vi.fn(async (input: string | URL) => {

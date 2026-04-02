@@ -40,6 +40,32 @@ export interface XianTokenMetadata {
   logoUrl: string | null;
 }
 
+export interface GetTokenBalancesOptions {
+  limit?: number;
+  offset?: number;
+  includeZero?: boolean;
+}
+
+export interface XianTokenBalance {
+  contract: string;
+  balance: string | null;
+  name: string | null;
+  symbol: string | null;
+  logoUrl: string | null;
+  lastTxHash: string | null;
+  lastBlockHeight: XianNumber | null;
+  updatedAt: string | null;
+}
+
+export interface XianTokenBalancesResult {
+  available: boolean;
+  address: string;
+  items: XianTokenBalance[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface XianTxPayload {
   chain_id: string;
   contract: string;

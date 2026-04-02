@@ -18,6 +18,7 @@ import type {
   ContractSendOptions,
   EstimateStampsOptions,
   EstimateStampsResult,
+  GetTokenBalancesOptions,
   SimulateRequest,
   TokenApproveOptions,
   TokenTransferOptions,
@@ -25,6 +26,8 @@ import type {
   TransactionSubmission,
   WaitForTxOptions,
   XianClientOptions,
+  XianTokenBalance,
+  XianTokenBalancesResult,
   XianSignedTransaction,
   XianSigner,
   XianTxPayload,
@@ -102,6 +105,33 @@ function normalizeMaybeString(value: unknown): string | null {
     return null;
   }
   return typeof value === "string" ? value : String(value);
+}
+
+function normalizeMaybeXianNumber(value: unknown): number | bigint | null {
+  if (value == null) {
+    return null;
+  }
+  if (typeof value === "number" || typeof value === "bigint") {
+    return value;
+  }
+  if (typeof value === "string" && /^-?\d+$/.test(value)) {
+    return parseXianNumber(value);
+  }
+  return null;
+}
+
+function clampPageSize(value: number | undefined, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(0, Math.min(Math.trunc(value), 1_000));
+}
+
+function clampOffset(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.trunc(value));
 }
 
 function isPendingLookupReceipt(receipt: TransactionReceipt): boolean {
@@ -335,6 +365,46 @@ export class XianClient {
       name: normalizeMaybeString(name),
       symbol: normalizeMaybeString(symbol),
       logoUrl: normalizeMaybeString(logoUrl)
+    };
+  }
+
+  async getTokenBalances(
+    address: string,
+    options?: GetTokenBalancesOptions
+  ): Promise<XianTokenBalancesResult> {
+    const limit = clampPageSize(options?.limit, 100);
+    const offset = clampOffset(options?.offset);
+    const includeZero = options?.includeZero === true;
+    let path = `/token_balances/${address}/limit=${limit}/offset=${offset}`;
+    if (includeZero) {
+      path += "/include_zero=true";
+    }
+
+    const data = await this.abciQuery(path);
+    const value = this.decodeAbciValue(asRecord(asRecord(data.result).response).value);
+    const payload = asRecord(value);
+    const items = Array.isArray(payload.items)
+      ? payload.items
+          .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
+          .map((item): XianTokenBalance => ({
+            contract: String(item.contract ?? ""),
+            balance: normalizeMaybeString(item.balance),
+            name: normalizeMaybeString(item.name),
+            symbol: normalizeMaybeString(item.symbol),
+            logoUrl: normalizeMaybeString(item.logo_url),
+            lastTxHash: normalizeMaybeString(item.last_tx_hash),
+            lastBlockHeight: normalizeMaybeXianNumber(item.last_block_height),
+            updatedAt: normalizeMaybeString(item.updated_at)
+          }))
+      : [];
+
+    return {
+      available: payload.available !== false,
+      address: String(payload.address ?? address),
+      items,
+      total: Number(payload.total ?? items.length),
+      limit: Number(payload.limit ?? limit),
+      offset: Number(payload.offset ?? offset)
     };
   }
 
