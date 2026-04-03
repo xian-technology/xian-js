@@ -1,6 +1,6 @@
 {
   "name": "@xian-tech/client",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Typed Xian client, tx helpers, and Ed25519 signer",
   "repository": {
     "type": "git",
