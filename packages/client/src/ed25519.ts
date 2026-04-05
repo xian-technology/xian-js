@@ -1,8 +1,8 @@
 import nacl from "tweetnacl";
 
-import { bytesToHex, hexToBytes, utf8ToBytes } from "./encoding";
-import { TransactionError } from "./errors";
-import type { XianSigner } from "./types";
+import { bytesToHex, hexToBytes, utf8ToBytes } from "./encoding.js";
+import { TransactionError } from "./errors.js";
+import type { XianSigner } from "./types.js";
 
 const KEY_HEX_LENGTH = 64;
 const SIGNATURE_HEX_LENGTH = 128;

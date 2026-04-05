@@ -7,10 +7,10 @@ import {
   parseXianNumber,
   sortKeysDeep,
   utf8ToBytes
-} from "./encoding";
-import { isValidEd25519Signature } from "./ed25519";
-import { AbciError, RpcError, SimulationError, TransactionError, TransportError, TxTimeoutError } from "./errors";
-import { WatchApi } from "./watch";
+} from "./encoding.js";
+import { isValidEd25519Signature } from "./ed25519.js";
+import { AbciError, RpcError, SimulationError, TransactionError, TransportError, TxTimeoutError } from "./errors.js";
+import { WatchApi } from "./watch.js";
 import type {
   BroadcastMode,
   BroadcastTxOptions,
@@ -32,7 +32,7 @@ import type {
   XianSigner,
   XianTxPayload,
   XianUnsignedTransaction
-} from "./types";
+} from "./types.js";
 
 const EMPTY_ABCI_VALUE = "AA==";
 const DEFAULT_TIMEOUT_MS = 30_000;

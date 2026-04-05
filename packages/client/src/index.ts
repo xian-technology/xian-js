@@ -1,4 +1,4 @@
-export { XianClient, ContractClient, TokenClient } from "./client";
+export { XianClient, ContractClient, TokenClient } from "./client.js";
 export {
   Ed25519Signer,
   generatePrivateKey,
@@ -7,14 +7,14 @@ export {
   publicKeyFromPrivateKey,
   signMessage,
   verifyMessage
-} from "./ed25519";
+} from "./ed25519.js";
 export {
   canonicalizeRuntime,
   decodeRuntime,
   encodeRuntime,
   parseXianNumber,
   sortKeysDeep
-} from "./encoding";
+} from "./encoding.js";
 export {
   AbciError,
   RpcError,
@@ -23,6 +23,6 @@ export {
   TransportError,
   TxTimeoutError,
   XianClientError
-} from "./errors";
-export { WatchApi } from "./watch";
-export type * from "./types";
+} from "./errors.js";
+export { WatchApi } from "./watch.js";
+export type * from "./types.js";

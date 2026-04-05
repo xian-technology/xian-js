@@ -1,4 +1,4 @@
-import { TransportError } from "./errors";
+import { TransportError } from "./errors.js";
 import type {
   WatchSubscription,
   XianBlockMessage,
@@ -7,7 +7,7 @@ import type {
   XianWatchEventFilter,
   XianWebSocketFactory,
   XianWebSocketLike
-} from "./types";
+} from "./types.js";
 
 interface WatchApiOptions {
   dashboardUrl?: string;
