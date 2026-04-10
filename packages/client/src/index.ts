@@ -1,5 +1,11 @@
 export { XianClient, ContractClient, TokenClient } from "./client.js";
 export {
+  XianShieldedRelayerClient,
+  XianShieldedRelayerPoolClient,
+  normalizeShieldedRelayerCatalogEntry,
+  sortShieldedRelayerCatalog
+} from "./relayer.js";
+export {
   Ed25519Signer,
   generatePrivateKey,
   isValidEd25519Key,
