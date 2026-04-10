@@ -16,8 +16,8 @@ import type {
   BroadcastTxOptions,
   BuildTxRequest,
   ContractSendOptions,
-  EstimateStampsOptions,
-  EstimateStampsResult,
+  EstimateChiOptions,
+  EstimateChiResult,
   GetShieldedWalletHistoryOptions,
   GetTokenBalancesOptions,
   SimulateRequest,
@@ -40,8 +40,8 @@ import type {
 const EMPTY_ABCI_VALUE = "AA==";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_POLL_INTERVAL_MS = 500;
-const DEFAULT_STAMP_MARGIN = 0.2;
-const DEFAULT_MIN_STAMP_HEADROOM = 5_000;
+const DEFAULT_CHI_MARGIN = 0.2;
+const DEFAULT_MIN_CHI_HEADROOM = 5_000;
 
 function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
@@ -153,7 +153,7 @@ function isPendingLookupReceipt(receipt: TransactionReceipt): boolean {
 
 function validatePayload(payload: XianTxPayload): void {
   const keys = Object.keys(payload).sort();
-  const expected = ["chain_id", "contract", "function", "kwargs", "nonce", "sender", "stamps_supplied"];
+  const expected = ["chain_id", "chi_supplied", "contract", "function", "kwargs", "nonce", "sender"];
   if (keys.join(",") !== expected.join(",")) {
     throw new TransactionError("payload must contain the canonical Xian transaction keys");
   }
@@ -169,8 +169,8 @@ function validatePayload(payload: XianTxPayload): void {
   if (!isNonNegativeInteger(payload.nonce)) {
     throw new TransactionError("nonce must be a non-negative integer");
   }
-  if (!isNonNegativeInteger(payload.stamps_supplied)) {
-    throw new TransactionError("stamps_supplied must be a non-negative integer");
+  if (!isNonNegativeInteger(payload.chi_supplied)) {
+    throw new TransactionError("chi_supplied must be a non-negative integer");
   }
 
   for (const key of Object.keys(payload.kwargs)) {
@@ -470,8 +470,8 @@ export class XianClient {
     };
   }
 
-  async getStampRate(): Promise<number | bigint | null> {
-    const value = await this.getState("stamp_cost", "S", ["value"]);
+  async getChiRate(): Promise<number | bigint | null> {
+    const value = await this.getState("chi_cost", "S", ["value"]);
     if (value == null) {
       return null;
     }
@@ -567,20 +567,20 @@ export class XianClient {
     return simulation.result;
   }
 
-  async estimateStamps(
+  async estimateChi(
     request: SimulateRequest,
-    options?: EstimateStampsOptions
-  ): Promise<EstimateStampsResult> {
+    options?: EstimateChiOptions
+  ): Promise<EstimateChiResult> {
     const simulation = await this.simulate(request);
-    const rawStamps = simulation.stamps_used;
+    const rawChi = simulation.chi_used;
     const estimated =
-      typeof rawStamps === "number"
-        ? rawStamps
-        : Number.parseInt(String(rawStamps ?? "0"), 10);
-    const stampMargin = options?.stampMargin ?? DEFAULT_STAMP_MARGIN;
-    const minStampHeadroom = options?.minStampHeadroom ?? DEFAULT_MIN_STAMP_HEADROOM;
-    const proportional = Math.ceil(estimated * stampMargin);
-    const suggested = estimated + Math.max(proportional, minStampHeadroom);
+      typeof rawChi === "number"
+        ? rawChi
+        : Number.parseInt(String(rawChi ?? "0"), 10);
+    const chiMargin = options?.chiMargin ?? DEFAULT_CHI_MARGIN;
+    const minChiHeadroom = options?.minChiHeadroom ?? DEFAULT_MIN_CHI_HEADROOM;
+    const proportional = Math.ceil(estimated * chiMargin);
+    const suggested = estimated + Math.max(proportional, minChiHeadroom);
 
     return {
       estimated,
@@ -592,16 +592,16 @@ export class XianClient {
   async buildTx(request: BuildTxRequest): Promise<XianUnsignedTransaction> {
     const chainId = request.chainId ?? (await this.getChainId());
     const nonce = request.nonce ?? (await this.getNonce(request.sender));
-    let stampsSupplied = request.stampsSupplied ?? request.stamps;
+    let chiSupplied = request.chiSupplied ?? request.chi;
 
-    if (stampsSupplied == null) {
-      const estimate = await this.estimateStamps({
+    if (chiSupplied == null) {
+      const estimate = await this.estimateChi({
         sender: request.sender,
         contract: request.contract,
         function: request.function,
         kwargs: request.kwargs
       });
-      stampsSupplied = estimate.suggested;
+      chiSupplied = estimate.suggested;
     }
 
     const payload = sortKeysDeep({
@@ -611,7 +611,7 @@ export class XianClient {
       kwargs: request.kwargs,
       nonce,
       sender: request.sender,
-      stamps_supplied: stampsSupplied
+      chi_supplied: chiSupplied
     }) as XianTxPayload;
 
     validatePayload(payload);
@@ -671,7 +671,7 @@ export class XianClient {
       message: "error" in data ? readErrorMessage(asRecord(data.error)) : undefined,
       mode,
       nonce: tx.payload.nonce,
-      stampsSupplied: tx.payload.stamps_supplied,
+      chiSupplied: tx.payload.chi_supplied,
       response: data
     };
 
@@ -799,7 +799,7 @@ export class ContractClient {
       waitForTx: options.waitForTx,
       timeoutMs: options.timeoutMs,
       pollIntervalMs: options.pollIntervalMs,
-      stamps: options.stamps,
+      chi: options.chi,
       nonce: options.nonce,
       chainId: options.chainId
     });
@@ -845,7 +845,7 @@ export class TokenClient {
       waitForTx: options.waitForTx,
       timeoutMs: options.timeoutMs,
       pollIntervalMs: options.pollIntervalMs,
-      stamps: options.stamps,
+      chi: options.chi,
       nonce: options.nonce,
       chainId: options.chainId
     });
@@ -869,7 +869,7 @@ export class TokenClient {
       waitForTx: options.waitForTx,
       timeoutMs: options.timeoutMs,
       pollIntervalMs: options.pollIntervalMs,
-      stamps: options.stamps,
+      chi: options.chi,
       nonce: options.nonce,
       chainId: options.chainId
     });

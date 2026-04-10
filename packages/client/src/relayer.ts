@@ -252,11 +252,11 @@ function normalizeSubmission(value: unknown): TransactionSubmission | null {
       ? modeValue
       : "checktx";
   const nonce = normalizeMaybeXianNumber(raw.nonce) ?? 0;
-  const stampsSupplied = normalizeMaybeXianNumber(
-    raw.stamps_supplied ?? raw.stampsSupplied
+  const chiSupplied = normalizeMaybeXianNumber(
+    raw.chi_supplied ?? raw.chiSupplied
   ) ?? 0;
-  const stampsEstimated = normalizeMaybeInteger(
-    raw.stamps_estimated ?? raw.stampsEstimated
+  const chiEstimated = normalizeMaybeInteger(
+    raw.chi_estimated ?? raw.chiEstimated
   ) ?? undefined;
   return {
     submitted: Boolean(raw.submitted),
@@ -269,8 +269,8 @@ function normalizeSubmission(value: unknown): TransactionSubmission | null {
     message: raw.message,
     mode,
     nonce,
-    stampsSupplied,
-    stampsEstimated,
+    chiSupplied,
+    chiEstimated,
     response: asRecord(raw.response ?? raw),
     receipt: normalizeReceipt(raw.receipt) ?? undefined
   };

@@ -28,7 +28,7 @@ function createClient(): XianProviderClient {
         kwargs: request.kwargs,
         nonce: 1,
         sender: request.sender,
-        stamps_supplied: request.stampsSupplied ?? request.stamps ?? 50_000
+        chi_supplied: request.chiSupplied ?? request.chi ?? 50_000
       }
     })),
     signTx: vi.fn(async (tx) => ({
@@ -42,7 +42,7 @@ function createClient(): XianProviderClient {
       txHash: "ABC123",
       mode: "checktx",
       nonce: 1,
-      stampsSupplied: 50_000,
+      chiSupplied: 50_000,
       response: {}
     }))
   };
@@ -178,7 +178,7 @@ describe("@xian-tech/provider injected discovery", () => {
         kwargs: { to: "bob", amount: "5" },
         nonce: 1,
         sender: "f".repeat(64),
-        stamps_supplied: 50_000
+        chi_supplied: 50_000
       }
     });
     await expect(

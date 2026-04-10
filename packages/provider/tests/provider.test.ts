@@ -55,7 +55,7 @@ describe("@xian-tech/provider", () => {
         kwargs: { to: "bob", amount: "5" },
         nonce: 1,
         sender: "a".repeat(64),
-        stamps_supplied: 50_000
+        chi_supplied: 50_000
       }
     };
 
@@ -71,7 +71,7 @@ describe("@xian-tech/provider", () => {
       txHash: "ABC123",
       mode: "checktx" as const,
       nonce: 1,
-      stampsSupplied: 50_000,
+      chiSupplied: 50_000,
       response: {}
     };
 
@@ -163,7 +163,7 @@ describe("@xian-tech/provider", () => {
         kwargs: { to: "bob", amount: "5" },
         nonce: 7,
         sender: "a".repeat(64),
-        stamps_supplied: 55_000
+        chi_supplied: 55_000
       }
     };
     const submission = {
@@ -173,7 +173,7 @@ describe("@xian-tech/provider", () => {
       txHash: "PREPARED123",
       mode: "checktx" as const,
       nonce: 7,
-      stampsSupplied: 55_000,
+      chiSupplied: 55_000,
       response: {}
     };
     const onWatchAsset = vi.fn(async () => true);
@@ -235,8 +235,8 @@ describe("@xian-tech/provider", () => {
       function: "transfer",
       kwargs: { to: "bob", amount: "5" },
       chainId: "xian-local",
-      stamps: undefined,
-      stampsSupplied: undefined
+      chi: undefined,
+      chiSupplied: undefined
     });
     expect(client.broadcastTx).toHaveBeenCalled();
     expect(onWatchAsset).toHaveBeenCalledWith({

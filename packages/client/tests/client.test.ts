@@ -88,7 +88,7 @@ describe("@xian-tech/client", () => {
       function: "transfer",
       kwargs: { to: "bob", amount: "5" },
       nonce: 1,
-      stamps: 50_000
+      chi: 50_000
     });
     const signedTx = await client.signTx(tx, signer);
     const submission = await client.broadcastTx(signedTx, { mode: "checktx" });
@@ -174,7 +174,7 @@ describe("@xian-tech/client", () => {
     await expect(client.getBalance("a".repeat(64))).resolves.toBe(12);
   });
 
-  it("reads token metadata and stamp rate through state lookups", async () => {
+  it("reads token metadata and chi rate through state lookups", async () => {
     const fetchFn = vi.fn(async (input: string | URL) => {
       const url = new URL(String(input));
       const path = decodeURIComponent(url.searchParams.get("path") ?? "");
@@ -208,7 +208,7 @@ describe("@xian-tech/client", () => {
           }
         });
       }
-      if (url.pathname.endsWith("/abci_query") && path.includes("stamp_cost.S:value")) {
+      if (url.pathname.endsWith("/abci_query") && path.includes("chi_cost.S:value")) {
         return jsonResponse({
           result: {
             response: {
@@ -240,7 +240,7 @@ describe("@xian-tech/client", () => {
       logoUrl: "https://example.com/token.png",
       logoSvg: null
     });
-    await expect(client.getStampRate()).resolves.toBe(25);
+    await expect(client.getChiRate()).resolves.toBe(25);
   });
 
   it("falls back to on-chain SVG metadata when no logo URL is configured", async () => {

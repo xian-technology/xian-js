@@ -22,8 +22,8 @@ export interface BuildTxRequest {
   kwargs: Record<string, unknown>;
   chainId?: string;
   nonce?: XianNumber;
-  stamps?: XianNumber;
-  stampsSupplied?: XianNumber;
+  chi?: XianNumber;
+  chiSupplied?: XianNumber;
 }
 
 export interface SimulateRequest {
@@ -107,7 +107,7 @@ export interface XianTxPayload {
   kwargs: Record<string, unknown>;
   nonce: XianNumber;
   sender: string;
-  stamps_supplied: XianNumber;
+  chi_supplied: XianNumber;
 }
 
 export interface XianUnsignedTransaction {
@@ -133,12 +133,12 @@ export interface WaitForTxOptions {
   pollIntervalMs?: number;
 }
 
-export interface EstimateStampsOptions {
-  stampMargin?: number;
-  minStampHeadroom?: number;
+export interface EstimateChiOptions {
+  chiMargin?: number;
+  minChiHeadroom?: number;
 }
 
-export interface EstimateStampsResult {
+export interface EstimateChiResult {
   estimated: number;
   suggested: number;
   simulation: Record<string, unknown>;
@@ -161,8 +161,8 @@ export interface TransactionSubmission {
   message?: unknown;
   mode: BroadcastMode;
   nonce: XianNumber;
-  stampsSupplied: XianNumber;
-  stampsEstimated?: number;
+  chiSupplied: XianNumber;
+  chiEstimated?: number;
   response: Record<string, unknown>;
   receipt?: TransactionReceipt;
 }
@@ -317,7 +317,7 @@ export interface XianShieldedRelayerJobResolution {
 }
 
 export interface ContractSendOptions extends BroadcastTxOptions {
-  stamps?: XianNumber;
+  chi?: XianNumber;
   nonce?: XianNumber;
   chainId?: string;
 }

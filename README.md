@@ -26,7 +26,7 @@ const tx = await client.buildTx({
   contract: "currency",
   function: "transfer",
   kwargs: { to: "bob", amount: 5 },
-  stamps: 50_000,
+  chi: 50_000,
 });
 
 const signedTx = await client.signTx(tx, signer);

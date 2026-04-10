@@ -23,7 +23,7 @@ export interface XianTxPayload {
   kwargs: Record<string, unknown>;
   nonce: XianNumber;
   sender: string;
-  stamps_supplied: XianNumber;
+  chi_supplied: XianNumber;
 }
 
 export interface XianUnsignedTransaction {
@@ -45,7 +45,7 @@ export interface TransactionSubmission {
   message?: unknown;
   mode: BroadcastMode;
   nonce: XianNumber;
-  stampsSupplied: XianNumber;
+  chiSupplied: XianNumber;
   response: Record<string, unknown>;
 }
 
@@ -95,8 +95,8 @@ export interface XianTransactionIntent {
   function: string;
   kwargs: Record<string, unknown>;
   chainId?: string;
-  stamps?: XianNumber | string;
-  stampsSupplied?: XianNumber | string;
+  chi?: XianNumber | string;
+  chiSupplied?: XianNumber | string;
 }
 
 export interface XianProviderRequest {
@@ -118,8 +118,8 @@ export interface XianProviderClient {
     function: string;
     kwargs: Record<string, unknown>;
     chainId?: string;
-    stamps?: XianNumber;
-    stampsSupplied?: XianNumber;
+    chi?: XianNumber;
+    chiSupplied?: XianNumber;
   }): Promise<XianUnsignedTransaction>;
   signTx(tx: XianUnsignedTransaction, signer: XianSigner): Promise<XianSignedTransaction>;
   broadcastTx(
@@ -331,10 +331,10 @@ export class InMemoryXianProvider implements XianProvider {
       function: intent.function,
       kwargs: intent.kwargs,
       chainId: activeChainId,
-      stamps: parseOptionalXianNumber(intent.stamps, "stamps"),
-      stampsSupplied: parseOptionalXianNumber(
-        intent.stampsSupplied,
-        "stampsSupplied"
+      chi: parseOptionalXianNumber(intent.chi, "chi"),
+      chiSupplied: parseOptionalXianNumber(
+        intent.chiSupplied,
+        "chiSupplied"
       )
     });
   }

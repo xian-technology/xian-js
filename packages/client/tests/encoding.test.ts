@@ -11,7 +11,7 @@ import {
 describe("@xian-tech/client encoding", () => {
   it("canonicalizes payloads with sorted keys", () => {
     const canonical = canonicalizeRuntime({
-      stamps_supplied: 50000,
+      chi_supplied: 50000,
       sender: "a".repeat(64),
       nonce: 7,
       kwargs: {
@@ -24,7 +24,7 @@ describe("@xian-tech/client encoding", () => {
     });
 
     expect(canonical).toBe(
-      '{"chain_id":"xian-local","contract":"currency","function":"transfer","kwargs":{"amount":"5","to":"bob"},"nonce":7,"sender":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","stamps_supplied":50000}'
+      '{"chain_id":"xian-local","chi_supplied":50000,"contract":"currency","function":"transfer","kwargs":{"amount":"5","to":"bob"},"nonce":7,"sender":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
     );
   });
 
@@ -44,7 +44,7 @@ describe("@xian-tech/client encoding", () => {
       function: "transfer",
       kwargs: { amount: "5", to: "bob" },
       nonce: 1,
-      stamps_supplied: 50000,
+      chi_supplied: 50000,
       chain_id: "xian-local"
     });
 

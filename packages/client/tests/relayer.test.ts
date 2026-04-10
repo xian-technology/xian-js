@@ -108,8 +108,8 @@ describe("@xian-tech/client relayer", () => {
             tx_hash: "ABC123",
             mode: "checktx",
             nonce: 7,
-            stamps_supplied: 123,
-            stamps_estimated: 111,
+            chi_supplied: 123,
+            chi_estimated: 111,
             response: {
               result: {
                 hash: "ABC123"
@@ -138,8 +138,8 @@ describe("@xian-tech/client relayer", () => {
             tx_hash: "ABC123",
             mode: "checktx",
             nonce: 7,
-            stamps_supplied: 123,
-            stamps_estimated: 111,
+            chi_supplied: 123,
+            chi_estimated: 111,
             response: {
               result: {
                 hash: "ABC123"
@@ -175,7 +175,7 @@ describe("@xian-tech/client relayer", () => {
       submission: {
         submitted: true,
         accepted: true,
-        stampsSupplied: 123
+        chiSupplied: 123
       }
     });
     expect(fetched.jobId).toBe("job-1");
@@ -297,8 +297,8 @@ describe("@xian-tech/client relayer", () => {
             tx_hash: "DEF456",
             mode: "checktx",
             nonce: 11,
-            stamps_supplied: 222,
-            stamps_estimated: 200,
+            chi_supplied: 222,
+            chi_estimated: 200,
             response: {
               result: {
                 hash: "DEF456"

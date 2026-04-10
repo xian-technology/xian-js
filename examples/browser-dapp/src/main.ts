@@ -131,7 +131,7 @@ app.innerHTML = `
           <label>Function<input id="tx-function" value="transfer" /></label>
         </div>
         <div class="field-row">
-          <label>Stamps<input id="tx-stamps" value="50000" /></label>
+          <label>Chi<input id="tx-chi" value="50000" /></label>
           <label>Mode
             <select id="tx-mode">
               <option value="checktx">checktx</option>
@@ -142,7 +142,7 @@ app.innerHTML = `
         </div>
         <label>Kwargs JSON<textarea id="tx-kwargs">{"to": "bob", "amount": 5}</textarea></label>
         <div class="btn-row">
-          <button class="primary" id="build-tx" data-tip="Build an unsigned transaction from the fields above (fetches nonce and estimates stamps)">Prepare</button>
+          <button class="primary" id="build-tx" data-tip="Build an unsigned transaction from the fields above (fetches nonce and estimates chi)">Prepare</button>
           <button class="secondary" id="sign-tx" data-tip="Sign the previously prepared unsigned transaction">Sign</button>
           <button class="primary" id="send-tx" data-tip="Sign and broadcast the prepared transaction to the network">Send Prepared</button>
           <button class="secondary" id="send-call" data-tip="Prepare, sign, and broadcast in one step (intent-based call)">Quick Send</button>
@@ -195,7 +195,7 @@ const privateKeyInput = q<HTMLInputElement>("#private-key");
 const messageInput = q<HTMLInputElement>("#message");
 const txContractInput = q<HTMLInputElement>("#tx-contract");
 const txFunctionInput = q<HTMLInputElement>("#tx-function");
-const txStampsInput = q<HTMLInputElement>("#tx-stamps");
+const txChiInput = q<HTMLInputElement>("#tx-chi");
 const txModeSelect = q<HTMLSelectElement>("#tx-mode");
 const txKwargsInput = q<HTMLTextAreaElement>("#tx-kwargs");
 const addressOutput = q<HTMLElement>("#address");
@@ -403,12 +403,12 @@ q<HTMLButtonElement>("#build-tx").addEventListener("click", async () => {
   try {
     const s = need();
     const kwargs = JSON.parse(txKwargsInput.value) as Record<string, unknown>;
-    const parsedStamps = Number.parseInt(txStampsInput.value, 10);
+    const parsedChi = Number.parseInt(txChiInput.value, 10);
     s.unsignedTx = await s.wallet.prepareTransaction({
       contract: txContractInput.value.trim(),
       function: txFunctionInput.value.trim(),
       kwargs,
-      stamps: Number.isNaN(parsedStamps) ? undefined : parsedStamps
+      chi: Number.isNaN(parsedChi) ? undefined : parsedChi
     });
     s.signedTx = undefined;
     txOutput.textContent = JSON.stringify(s.unsignedTx, null, 2);
@@ -453,13 +453,13 @@ q<HTMLButtonElement>("#send-call").addEventListener("click", async () => {
   try {
     const s = need();
     const kwargs = JSON.parse(txKwargsInput.value) as Record<string, unknown>;
-    const parsedStamps = Number.parseInt(txStampsInput.value, 10);
+    const parsedChi = Number.parseInt(txChiInput.value, 10);
     const submission = await s.wallet.sendCall(
       {
         contract: txContractInput.value.trim(),
         function: txFunctionInput.value.trim(),
         kwargs,
-        stamps: Number.isNaN(parsedStamps) ? undefined : parsedStamps
+        chi: Number.isNaN(parsedChi) ? undefined : parsedChi
       },
       {
         mode: txModeSelect.value as "async" | "checktx" | "commit",
