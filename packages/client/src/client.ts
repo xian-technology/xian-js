@@ -18,6 +18,7 @@ import type {
   ContractSendOptions,
   EstimateStampsOptions,
   EstimateStampsResult,
+  GetShieldedWalletHistoryOptions,
   GetTokenBalancesOptions,
   SimulateRequest,
   TokenApproveOptions,
@@ -26,6 +27,8 @@ import type {
   TransactionSubmission,
   WaitForTxOptions,
   XianClientOptions,
+  XianShieldedWalletHistoryEntry,
+  XianShieldedWalletHistoryResult,
   XianTokenBalance,
   XianTokenBalancesResult,
   XianSignedTransaction,
@@ -116,6 +119,16 @@ function normalizeMaybeXianNumber(value: unknown): number | bigint | null {
   }
   if (typeof value === "string" && /^-?\d+$/.test(value)) {
     return parseXianNumber(value);
+  }
+  return null;
+}
+
+function normalizeMaybeInteger(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return value;
+  }
+  if (typeof value === "string" && /^-?\d+$/.test(value)) {
+    return Number(value);
   }
   return null;
 }
@@ -405,6 +418,53 @@ export class XianClient {
       total: Number(payload.total ?? items.length),
       limit: Number(payload.limit ?? limit),
       offset: Number(payload.offset ?? offset)
+    };
+  }
+
+  async getShieldedWalletHistory(
+    tagValue: string,
+    options?: GetShieldedWalletHistoryOptions
+  ): Promise<XianShieldedWalletHistoryResult> {
+    const limit = clampPageSize(options?.limit, 100);
+    const afterNoteIndex = clampOffset(options?.afterNoteIndex);
+    const kind = typeof options?.kind === "string" && options.kind.trim().length > 0
+      ? options.kind.trim()
+      : "sync_hint";
+
+    const data = await this.abciQuery(
+      `/shielded_wallet_history/${tagValue}/limit=${limit}/kind=${kind}/after_note_index=${afterNoteIndex}`
+    );
+    const value = this.decodeAbciValue(asRecord(asRecord(data.result).response).value);
+    const payload = asRecord(value);
+    const items = Array.isArray(payload.items)
+      ? payload.items
+          .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
+          .map((item): XianShieldedWalletHistoryEntry => ({
+            eventId: normalizeMaybeInteger(item.event_id),
+            txHash: normalizeMaybeString(item.tx_hash),
+            blockHeight: normalizeMaybeXianNumber(item.block_height),
+            txIndex: normalizeMaybeXianNumber(item.tx_index),
+            contract: normalizeMaybeString(item.contract),
+            function: normalizeMaybeString(item.function),
+            action: normalizeMaybeString(item.action),
+            outputIndex: normalizeMaybeXianNumber(item.output_index),
+            noteIndex: normalizeMaybeXianNumber(item.note_index),
+            commitment: normalizeMaybeString(item.commitment),
+            newRoot: normalizeMaybeString(item.new_root),
+            payloadHash: normalizeMaybeString(item.payload_hash),
+            tagKind: normalizeMaybeString(item.tag_kind),
+            tagValue: normalizeMaybeString(item.tag_value),
+            outputPayload: normalizeMaybeString(item.output_payload),
+            createdAt: normalizeMaybeString(item.created_at ?? item.created),
+            raw: item
+          }))
+      : [];
+
+    return {
+      available: payload.available !== false,
+      items,
+      limit: Number(payload.limit ?? limit),
+      afterNoteIndex: Number(payload.after_note_index ?? afterNoteIndex)
     };
   }
 

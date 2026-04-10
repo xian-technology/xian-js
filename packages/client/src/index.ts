@@ -16,6 +16,10 @@ export {
   sortKeysDeep
 } from "./encoding.js";
 export {
+  shieldedSyncHintFromViewingPrivateKey,
+  shieldedSyncHintFromViewingPublicKey
+} from "./shielded.js";
+export {
   AbciError,
   RpcError,
   SimulationError,
