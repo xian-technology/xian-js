@@ -38,6 +38,7 @@ export interface XianTokenMetadata {
   name: string | null;
   symbol: string | null;
   logoUrl: string | null;
+  logoSvg: string | null;
 }
 
 export interface GetTokenBalancesOptions {
@@ -131,6 +132,155 @@ export interface TransactionSubmission {
   stampsEstimated?: number;
   response: Record<string, unknown>;
   receipt?: TransactionReceipt;
+}
+
+export interface XianShieldedRelayerClientOptions {
+  relayerUrl: string;
+  authToken?: string;
+  fetchFn?: typeof fetch;
+}
+
+export type XianShieldedRelayKind =
+  | "shielded_note_relay_transfer"
+  | "shielded_command";
+
+export type XianShieldedRelayerAuthScheme = "none" | "bearer";
+
+export interface XianShieldedRelayerCatalogEntryInput {
+  id?: string;
+  relayerUrl?: string;
+  baseUrl?: string;
+  authToken?: string;
+  authScheme?: XianShieldedRelayerAuthScheme;
+  publicInfo?: boolean;
+  publicQuote?: boolean;
+  publicJobLookup?: boolean;
+  priority?: number;
+  submissionKinds?: XianShieldedRelayKind[];
+}
+
+export interface XianShieldedRelayerCatalogEntry {
+  id: string;
+  relayerUrl: string;
+  authToken?: string;
+  authScheme: XianShieldedRelayerAuthScheme;
+  publicInfo: boolean;
+  publicQuote: boolean;
+  publicJobLookup: boolean;
+  priority: number;
+  submissionKinds: XianShieldedRelayKind[];
+}
+
+export interface XianShieldedRelayerPoolClientOptions {
+  relayers: XianShieldedRelayerCatalogEntryInput[];
+  fetchFn?: typeof fetch;
+}
+
+export interface XianShieldedRelayerRouteOptions {
+  relayerId?: string;
+}
+
+export interface XianShieldedRelayerInfoPolicy {
+  quoteTtlSeconds: number;
+  defaultExpirySeconds: number;
+  maxExpirySeconds: number;
+  minNoteRelayerFee: XianNumber;
+  minCommandRelayerFee: XianNumber;
+  allowedNoteContracts: string[];
+  allowedCommandContracts: string[];
+  allowedCommandTargets: string[];
+}
+
+export interface XianShieldedRelayerInfo {
+  service: string;
+  protocolVersion: string;
+  available: boolean;
+  chainId: string | null;
+  relayerAccount: string | null;
+  submissionMode: BroadcastMode;
+  waitForTx: boolean;
+  capabilities: Record<string, boolean>;
+  policy: XianShieldedRelayerInfoPolicy;
+  raw: Record<string, unknown>;
+}
+
+export interface XianShieldedRelayerQuoteRequest {
+  kind: XianShieldedRelayKind;
+  contract: string;
+  targetContract?: string;
+  requestedRelayerFee?: XianNumber;
+  requestedExpiresInSeconds?: number;
+}
+
+export interface XianShieldedRelayerQuote {
+  kind: XianShieldedRelayKind;
+  contract: string;
+  targetContract: string | null;
+  chainId: string | null;
+  relayerAccount: string | null;
+  relayerFee: XianNumber;
+  expiresAt: string | null;
+  issuedAt: string | null;
+  policyVersion: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface XianShieldedRelayerInfoResolution {
+  relayer: XianShieldedRelayerCatalogEntry;
+  info: XianShieldedRelayerInfo;
+}
+
+export interface XianShieldedRelayerQuoteResolution {
+  relayer: XianShieldedRelayerCatalogEntry;
+  quote: XianShieldedRelayerQuote;
+}
+
+export interface SubmitShieldedNoteRelayTransferRequest {
+  contract: string;
+  oldRoot: string;
+  inputNullifiers: string[];
+  outputCommitments: string[];
+  proofHex: string;
+  relayerFee: XianNumber;
+  expiresAt?: string | null;
+  outputPayloads?: string[];
+  clientRequestId?: string;
+}
+
+export interface SubmitShieldedCommandRequest {
+  contract: string;
+  targetContract: string;
+  oldRoot: string;
+  inputNullifiers: string[];
+  outputCommitments: string[];
+  proofHex: string;
+  relayerFee: XianNumber;
+  publicAmount?: XianNumber;
+  payload?: Record<string, unknown> | null;
+  expiresAt?: string | null;
+  outputPayloads?: string[];
+  clientRequestId?: string;
+}
+
+export interface XianShieldedRelayerJob {
+  jobId: string;
+  kind: XianShieldedRelayKind;
+  status: string;
+  chainId: string | null;
+  relayerAccount: string | null;
+  contract: string | null;
+  functionName: string | null;
+  txHash: string | null;
+  submittedAt: string | null;
+  updatedAt: string | null;
+  error: string | null;
+  submission: TransactionSubmission | null;
+  raw: Record<string, unknown>;
+}
+
+export interface XianShieldedRelayerJobResolution {
+  relayer: XianShieldedRelayerCatalogEntry;
+  job: XianShieldedRelayerJob;
 }
 
 export interface ContractSendOptions extends BroadcastTxOptions {

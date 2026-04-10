@@ -344,27 +344,29 @@ export class XianClient {
     name: string | null;
     symbol: string | null;
     logoUrl: string | null;
+    logoSvg: string | null;
   }> {
-    if (contract === "currency") {
-      return {
-        contract,
-        name: "Xian",
-        symbol: "Xian",
-        logoUrl: null
-      };
-    }
-
     const [name, symbol, logoUrl] = await Promise.all([
       this.getState(contract, "metadata", ["token_name"]),
       this.getState(contract, "metadata", ["token_symbol"]),
       this.getState(contract, "metadata", ["token_logo_url"])
     ]);
+    const rawLogoUrl = normalizeMaybeString(logoUrl);
+    const normalizedLogoUrl = rawLogoUrl?.trim() ? rawLogoUrl.trim() : null;
+    let logoSvg: string | null = null;
+    if (!normalizedLogoUrl) {
+      const rawLogoSvg = normalizeMaybeString(
+        await this.getState(contract, "metadata", ["token_logo_svg"]).catch(() => null)
+      );
+      logoSvg = rawLogoSvg?.trim() ? rawLogoSvg.trim() : null;
+    }
 
     return {
       contract,
       name: normalizeMaybeString(name),
       symbol: normalizeMaybeString(symbol),
-      logoUrl: normalizeMaybeString(logoUrl)
+      logoUrl: normalizedLogoUrl,
+      logoSvg
     };
   }
 
@@ -756,6 +758,7 @@ export class TokenClient {
     name: string | null;
     symbol: string | null;
     logoUrl: string | null;
+    logoSvg: string | null;
   }> {
     return this.client.getTokenMetadata(this.tokenName);
   }

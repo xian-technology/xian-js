@@ -226,15 +226,78 @@ describe("@xian-tech/client", () => {
       contract: "con_token",
       name: "Demo Token",
       symbol: "DMT",
-      logoUrl: "https://example.com/token.png"
+      logoUrl: "https://example.com/token.png",
+      logoSvg: null
     });
     await expect(client.token("con_token").metadata()).resolves.toEqual({
       contract: "con_token",
       name: "Demo Token",
       symbol: "DMT",
-      logoUrl: "https://example.com/token.png"
+      logoUrl: "https://example.com/token.png",
+      logoSvg: null
     });
     await expect(client.getStampRate()).resolves.toBe(25);
+  });
+
+  it("falls back to on-chain SVG metadata when no logo URL is configured", async () => {
+    const fetchFn = vi.fn(async (input: string | URL) => {
+      const url = new URL(String(input));
+      const path = decodeURIComponent(url.searchParams.get("path") ?? "");
+      if (url.pathname.endsWith("/abci_query") && path.includes("con_svg.metadata:token_name")) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8("SVG Token")
+            }
+          }
+        });
+      }
+      if (url.pathname.endsWith("/abci_query") && path.includes("con_svg.metadata:token_symbol")) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8("SVG")
+            }
+          }
+        });
+      }
+      if (url.pathname.endsWith("/abci_query") && path.includes("con_svg.metadata:token_logo_url")) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8("")
+            }
+          }
+        });
+      }
+      if (url.pathname.endsWith("/abci_query") && path.includes("con_svg.metadata:token_logo_svg")) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'></svg>")
+            }
+          }
+        });
+      }
+      throw new Error(`unexpected URL: ${String(input)}`);
+    }) as typeof fetch;
+
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn
+    });
+
+    await expect(client.getTokenMetadata("con_svg")).resolves.toEqual({
+      contract: "con_svg",
+      name: "SVG Token",
+      symbol: "SVG",
+      logoUrl: null,
+      logoSvg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'></svg>"
+    });
   });
 
   it("reads indexed token balances through the BDS portfolio query", async () => {
