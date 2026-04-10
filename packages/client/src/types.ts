@@ -47,6 +47,39 @@ export interface GetTokenBalancesOptions {
   includeZero?: boolean;
 }
 
+export interface GetShieldedWalletHistoryOptions {
+  kind?: string;
+  limit?: number;
+  afterNoteIndex?: number;
+}
+
+export interface XianShieldedWalletHistoryEntry {
+  eventId: number | null;
+  txHash: string | null;
+  blockHeight: XianNumber | null;
+  txIndex: XianNumber | null;
+  contract: string | null;
+  function: string | null;
+  action: string | null;
+  outputIndex: XianNumber | null;
+  noteIndex: XianNumber | null;
+  commitment: string | null;
+  newRoot: string | null;
+  payloadHash: string | null;
+  tagKind: string | null;
+  tagValue: string | null;
+  outputPayload: string | null;
+  createdAt: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface XianShieldedWalletHistoryResult {
+  available: boolean;
+  items: XianShieldedWalletHistoryEntry[];
+  limit: number;
+  afterNoteIndex: number;
+}
+
 export interface XianTokenBalance {
   contract: string;
   balance: string | null;

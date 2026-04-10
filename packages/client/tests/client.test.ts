@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { Ed25519Signer, XianClient } from "../src/index";
+import {
+  Ed25519Signer,
+  shieldedSyncHintFromViewingPublicKey,
+  XianClient
+} from "../src/index";
 import type { XianWebSocketLike } from "../src/types";
 
 function encodeBase64Utf8(value: string): string {
@@ -363,6 +367,113 @@ describe("@xian-tech/client", () => {
       limit: 50,
       offset: 10
     });
+  });
+
+  it("reads shielded wallet history through the indexed wallet feed", async () => {
+    const fetchFn = vi.fn(async (input: string | URL) => {
+      const url = new URL(String(input));
+      const path = decodeURIComponent(url.searchParams.get("path") ?? "");
+      if (
+        url.pathname.endsWith("/abci_query") &&
+        path.includes("/shielded_wallet_history/0x1234/limit=5/kind=sync_hint/after_note_index=3")
+      ) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8(
+                JSON.stringify({
+                  available: true,
+                  items: [
+                    {
+                      event_id: 10,
+                      tx_hash: "TX-1",
+                      block_height: 12,
+                      tx_index: 0,
+                      contract: "con_private",
+                      function: "transfer_shielded",
+                      action: "transfer",
+                      output_index: 1,
+                      note_index: 4,
+                      commitment: "0xabc",
+                      new_root: "0xroot",
+                      payload_hash: "0xhash",
+                      tag_kind: "sync_hint",
+                      tag_value: "0x1234",
+                      output_payload: "0xpayload",
+                      created_at: "2026-04-10T12:00:00Z"
+                    }
+                  ],
+                  limit: 5,
+                  after_note_index: 3
+                })
+              )
+            }
+          }
+        });
+      }
+      throw new Error(`unexpected URL: ${String(input)}`);
+    }) as typeof fetch;
+
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn
+    });
+
+    await expect(
+      client.getShieldedWalletHistory("0x1234", {
+        limit: 5,
+        afterNoteIndex: 3
+      })
+    ).resolves.toEqual({
+      available: true,
+      items: [
+        {
+          eventId: 10,
+          txHash: "TX-1",
+          blockHeight: 12,
+          txIndex: 0,
+          contract: "con_private",
+          function: "transfer_shielded",
+          action: "transfer",
+          outputIndex: 1,
+          noteIndex: 4,
+          commitment: "0xabc",
+          newRoot: "0xroot",
+          payloadHash: "0xhash",
+          tagKind: "sync_hint",
+          tagValue: "0x1234",
+          outputPayload: "0xpayload",
+          createdAt: "2026-04-10T12:00:00Z",
+          raw: {
+            event_id: 10,
+            tx_hash: "TX-1",
+            block_height: 12,
+            tx_index: 0,
+            contract: "con_private",
+            function: "transfer_shielded",
+            action: "transfer",
+            output_index: 1,
+            note_index: 4,
+            commitment: "0xabc",
+            new_root: "0xroot",
+            payload_hash: "0xhash",
+            tag_kind: "sync_hint",
+            tag_value: "0x1234",
+            output_payload: "0xpayload",
+            created_at: "2026-04-10T12:00:00Z"
+          }
+        }
+      ],
+      limit: 5,
+      afterNoteIndex: 3
+    });
+  });
+
+  it("derives the shielded sync hint from a viewing public key", () => {
+    expect(
+      shieldedSyncHintFromViewingPublicKey("3".repeat(64))
+    ).toBe("0x2d0f3fbca5001e8d629dc630");
   });
 
   it("waits until a transaction lookup stops returning a pending error", async () => {

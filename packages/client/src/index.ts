@@ -1,5 +1,11 @@
 export { XianClient, ContractClient, TokenClient } from "./client.js";
 export {
+  XianShieldedRelayerClient,
+  XianShieldedRelayerPoolClient,
+  normalizeShieldedRelayerCatalogEntry,
+  sortShieldedRelayerCatalog
+} from "./relayer.js";
+export {
   Ed25519Signer,
   generatePrivateKey,
   isValidEd25519Key,
@@ -15,6 +21,10 @@ export {
   parseXianNumber,
   sortKeysDeep
 } from "./encoding.js";
+export {
+  shieldedSyncHintFromViewingPrivateKey,
+  shieldedSyncHintFromViewingPublicKey
+} from "./shielded.js";
 export {
   AbciError,
   RpcError,
