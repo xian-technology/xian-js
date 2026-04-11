@@ -1,6 +1,6 @@
 {
   "name": "xian-js",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "description": "Official JavaScript / TypeScript SDK workspace for Xian",
   "repository": {
