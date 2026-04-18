@@ -1,4 +1,9 @@
-import { parseXianNumber } from "./encoding.js";
+import { mergeAbortSignals } from "./client.js";
+import {
+  normalizeMaybeInteger,
+  normalizeMaybeString,
+  normalizeMaybeXianNumber,
+} from "./encoding.js";
 import { TransportError, XianClientError } from "./errors.js";
 import type {
   BroadcastMode,
@@ -50,33 +55,6 @@ function asArrayOfStrings(value: unknown): string[] {
     return [];
   }
   return value.filter((item): item is string => typeof item === "string");
-}
-
-function normalizeMaybeString(value: unknown): string | null {
-  if (value == null) {
-    return null;
-  }
-  return typeof value === "string" ? value : String(value);
-}
-
-function normalizeMaybeInteger(value: unknown): number | null {
-  if (typeof value === "number" && Number.isInteger(value)) {
-    return value;
-  }
-  if (typeof value === "string" && /^-?\d+$/.test(value)) {
-    return Number(value);
-  }
-  return null;
-}
-
-function normalizeMaybeXianNumber(value: unknown): number | bigint | null {
-  if (typeof value === "number" || typeof value === "bigint") {
-    return value;
-  }
-  if (typeof value === "string" && /^-?\d+$/.test(value)) {
-    return parseXianNumber(value);
-  }
-  return null;
 }
 
 function normalizeRelayKind(value: unknown): XianShieldedRelayKind | null {
@@ -280,17 +258,20 @@ export class XianShieldedRelayerClient {
   private readonly relayerUrl: string;
   private readonly authToken?: string;
   private readonly fetchFn: typeof fetch;
+  private readonly requestTimeoutMs: number;
 
   constructor(options: XianShieldedRelayerClientOptions) {
     this.relayerUrl = stripTrailingSlash(options.relayerUrl);
     this.authToken = options.authToken?.trim() || undefined;
     this.fetchFn = options.fetchFn ?? globalThis.fetch.bind(globalThis);
+    this.requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
   }
 
   private async requestJson(
     method: "GET" | "POST",
     path: string,
-    body?: Record<string, unknown>
+    body?: Record<string, unknown>,
+    options?: { signal?: AbortSignal; timeoutMs?: number }
   ): Promise<Record<string, unknown>> {
     const headers: Record<string, string> = {
       accept: "application/json"
@@ -304,18 +285,43 @@ export class XianShieldedRelayerClient {
       headers.authorization = `Bearer ${this.authToken}`;
     }
 
+    const timeoutMs = options?.timeoutMs ?? this.requestTimeoutMs;
+    const timeoutController =
+      timeoutMs > 0 ? new AbortController() : undefined;
+    const timeoutHandle = timeoutController
+      ? setTimeout(() => timeoutController.abort(), timeoutMs)
+      : undefined;
+    const signal = mergeAbortSignals(
+      options?.signal,
+      timeoutController?.signal
+    );
+
     let response: Response;
     try {
       response = await this.fetchFn(`${this.relayerUrl}${path}`, {
         method,
         headers,
-        body: payload
+        body: payload,
+        signal
       });
     } catch (error) {
+      if (options?.signal?.aborted) {
+        throw error;
+      }
+      if (timeoutController?.signal.aborted) {
+        throw new TransportError(
+          `relayer request timed out after ${timeoutMs}ms for ${this.relayerUrl}${path}`,
+          { cause: error }
+        );
+      }
       throw new TransportError(
         `request failed for ${this.relayerUrl}${path}`,
         { cause: error }
       );
+    } finally {
+      if (timeoutHandle !== undefined) {
+        clearTimeout(timeoutHandle);
+      }
     }
 
     let decoded: unknown;

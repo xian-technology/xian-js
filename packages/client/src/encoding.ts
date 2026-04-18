@@ -33,7 +33,15 @@ export function base64ToUtf8(value: string): string {
     );
   }
 
-  throw new TypeError("global atob() is required to decode base64 payloads");
+  // Node.js runtimes that pre-date the global atob (added in Node 16) still
+  // have Buffer available. Check for it before falling over so the SDK keeps
+  // working in older server-side consumers.
+  const maybeBuffer = (globalThis as { Buffer?: { from(input: string, encoding: string): { toString(encoding: string): string } } }).Buffer;
+  if (maybeBuffer && typeof maybeBuffer.from === "function") {
+    return maybeBuffer.from(value, "base64").toString("utf-8");
+  }
+
+  throw new TypeError("global atob() or Buffer is required to decode base64 payloads");
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -147,4 +155,45 @@ export function canonicalizeRuntime(value: unknown): string {
 export function parseXianNumber(value: string): number | bigint {
   const normalized = BigInt(value);
   return normalized <= MAX_SAFE ? Number(normalized) : normalized;
+}
+
+/**
+ * Normalize an unknown value to a JS number or bigint if it looks like an
+ * integer, preserving precision for values that don't fit in Number. Returns
+ * null for anything that isn't a plain integer representation.
+ */
+export function normalizeMaybeXianNumber(value: unknown): number | bigint | null {
+  if (value == null) {
+    return null;
+  }
+  if (typeof value === "number" || typeof value === "bigint") {
+    return value;
+  }
+  if (typeof value === "string" && /^-?\d+$/.test(value)) {
+    return parseXianNumber(value);
+  }
+  return null;
+}
+
+/**
+ * Normalize an unknown value to a safe JS integer. Returns null when the
+ * input isn't a plain integer. Callers that need big-integer precision
+ * should use {@link normalizeMaybeXianNumber} instead.
+ */
+export function normalizeMaybeInteger(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return value;
+  }
+  if (typeof value === "string" && /^-?\d+$/.test(value)) {
+    return Number(value);
+  }
+  return null;
+}
+
+/** Normalize an unknown value to a string (or null if missing). */
+export function normalizeMaybeString(value: unknown): string | null {
+  if (value == null) {
+    return null;
+  }
+  return typeof value === "string" ? value : String(value);
 }

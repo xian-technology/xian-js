@@ -4,6 +4,8 @@ import {
   canonicalizeRuntime,
   decodeRuntime,
   encodeRuntime,
+  normalizeMaybeInteger,
+  normalizeMaybeXianNumber,
   parseXianNumber,
   sortKeysDeep,
   utf8ToBytes
@@ -110,27 +112,45 @@ function normalizeMaybeString(value: unknown): string | null {
   return typeof value === "string" ? value : String(value);
 }
 
-function normalizeMaybeXianNumber(value: unknown): number | bigint | null {
+/**
+ * Coerce a chi_used value from a simulation response to a JS number.
+ *
+ * The simulator returns chi_used as either a number or a stringified
+ * integer. Historically we used Number.parseInt here, which silently
+ * truncates on scientific notation ("1e6" → 1), decimals ("1.5" → 1),
+ * and loses precision above 2^53 for large strings. parseXianNumber
+ * runs it through BigInt so oversized values are flagged. Chi values
+ * in practice fit comfortably inside Number.MAX_SAFE_INTEGER, so we
+ * collapse the bigint branch back to a number and throw only if the
+ * estimate is actually too large to represent safely — that can't
+ * happen today, but an explicit failure beats a silent mis-estimate.
+ */
+function coerceChiEstimate(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
   if (value == null) {
-    return null;
+    return 0;
   }
-  if (typeof value === "number" || typeof value === "bigint") {
-    return value;
+  const raw = String(value).trim();
+  if (raw === "") {
+    return 0;
   }
-  if (typeof value === "string" && /^-?\d+$/.test(value)) {
-    return parseXianNumber(value);
+  try {
+    const parsed = parseXianNumber(raw);
+    if (typeof parsed === "bigint") {
+      throw new Error(
+        `chi_used estimate ${raw} exceeds Number.MAX_SAFE_INTEGER`
+      );
+    }
+    return parsed;
+  } catch (err) {
+    throw new Error(
+      `invalid chi_used estimate ${JSON.stringify(value)}: ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
   }
-  return null;
-}
-
-function normalizeMaybeInteger(value: unknown): number | null {
-  if (typeof value === "number" && Number.isInteger(value)) {
-    return value;
-  }
-  if (typeof value === "string" && /^-?\d+$/.test(value)) {
-    return Number(value);
-  }
-  return null;
 }
 
 function clampPageSize(value: number | undefined, fallback: number): number {
@@ -149,6 +169,41 @@ function clampOffset(value: number | undefined): number {
 
 function isPendingLookupReceipt(receipt: TransactionReceipt): boolean {
   return !receipt.success && receipt.txHash == null && receipt.transaction == null;
+}
+
+/**
+ * Combine a caller-provided AbortSignal with a timeout-backed internal
+ * signal so either one triggering aborts the underlying fetch. We prefer
+ * AbortSignal.any when available; on older runtimes we stitch them
+ * together manually.
+ */
+export function mergeAbortSignals(
+  a: AbortSignal | undefined,
+  b: AbortSignal | undefined
+): AbortSignal | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const anyFn = (AbortSignal as unknown as {
+    any?: (signals: AbortSignal[]) => AbortSignal;
+  }).any;
+  if (typeof anyFn === "function") {
+    return anyFn([a, b]);
+  }
+  const controller = new AbortController();
+  const forward = (signal: AbortSignal) => {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      return;
+    }
+    signal.addEventListener(
+      "abort",
+      () => controller.abort(signal.reason),
+      { once: true }
+    );
+  };
+  forward(a);
+  forward(b);
+  return controller.signal;
 }
 
 function validatePayload(payload: XianTxPayload): void {
@@ -186,6 +241,7 @@ export class XianClient {
   readonly watch: WatchApi;
 
   private readonly fetchFn: typeof fetch;
+  private readonly requestTimeoutMs: number;
   private chainIdCache?: string;
 
   constructor(options: XianClientOptions) {
@@ -195,18 +251,51 @@ export class XianClient {
       : undefined;
     this.chainIdCache = options.chainId;
     this.fetchFn = options.fetchFn ?? globalThis.fetch.bind(globalThis);
+    this.requestTimeoutMs =
+      options.requestTimeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.watch = new WatchApi({
       dashboardUrl: this.dashboardUrl,
       webSocketFactory: options.webSocketFactory
     });
   }
 
-  private async requestJson(method: "GET" | "POST", url: string): Promise<Record<string, unknown>> {
+  private async requestJson(
+    method: "GET" | "POST",
+    url: string,
+    options?: { signal?: AbortSignal; timeoutMs?: number }
+  ): Promise<Record<string, unknown>> {
+    const timeoutMs = options?.timeoutMs ?? this.requestTimeoutMs;
+    const timeoutController =
+      timeoutMs > 0 ? new AbortController() : undefined;
+    const timeoutHandle = timeoutController
+      ? setTimeout(() => timeoutController.abort(), timeoutMs)
+      : undefined;
+
+    const callerSignal = options?.signal;
+    const signal = mergeAbortSignals(callerSignal, timeoutController?.signal);
+
     let response: Response;
     try {
-      response = await this.fetchFn(url, { method });
+      response = await this.fetchFn(url, {
+        method,
+        headers: method === "POST" ? { "content-type": "application/json" } : undefined,
+        signal,
+      });
     } catch (error) {
+      if (callerSignal?.aborted) {
+        throw error;
+      }
+      if (timeoutController?.signal.aborted) {
+        throw new TransportError(
+          `request timed out after ${timeoutMs}ms for ${url}`,
+          { cause: error }
+        );
+      }
       throw new TransportError(`request failed for ${url}`, { cause: error });
+    } finally {
+      if (timeoutHandle !== undefined) {
+        clearTimeout(timeoutHandle);
+      }
     }
 
     if (!response.ok) {
@@ -572,11 +661,7 @@ export class XianClient {
     options?: EstimateChiOptions
   ): Promise<EstimateChiResult> {
     const simulation = await this.simulate(request);
-    const rawChi = simulation.chi_used;
-    const estimated =
-      typeof rawChi === "number"
-        ? rawChi
-        : Number.parseInt(String(rawChi ?? "0"), 10);
+    const estimated = coerceChiEstimate(simulation.chi_used);
     const chiMargin = options?.chiMargin ?? DEFAULT_CHI_MARGIN;
     const minChiHeadroom = options?.minChiHeadroom ?? DEFAULT_MIN_CHI_HEADROOM;
     const proportional = Math.ceil(estimated * chiMargin);

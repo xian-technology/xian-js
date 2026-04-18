@@ -20,6 +20,8 @@ interface ManagedSubscriptionOptions<TMessage> {
   subscribeMessage?: Record<string, unknown>;
   shouldHandle(message: unknown): message is TMessage;
   onMessage(message: TMessage): void;
+  /** Optional callback for malformed/unparseable messages. */
+  onError?(error: Error): void;
 }
 
 function ensureWebSocketFactory(factory?: XianWebSocketFactory): XianWebSocketFactory {
@@ -76,13 +78,35 @@ class ManagedSubscription<TMessage> implements WatchSubscription {
       this.reconnectTimer = setTimeout(() => this.connect(), 500);
     };
     this.socket.onmessage = (event) => {
-      void this.handleMessage(event.data);
+      // handleMessage may throw on unparseable payloads or if the user's
+      // onMessage handler rejects. Returning the promise as `void` makes
+      // those failures become unhandledrejection events, which is
+      // process-terminating in Node. Swallow them here and surface via the
+      // optional onError callback instead.
+      this.handleMessage(event.data).catch((err: unknown) => {
+        const error =
+          err instanceof Error ? err : new Error(String(err));
+        try {
+          this.options.onError?.(error);
+        } catch {
+          // User-provided onError threw; nothing safe to do here.
+        }
+      });
     };
   }
 
   private async handleMessage(rawData: unknown): Promise<void> {
     const text = await coerceSocketMessage(rawData);
-    const parsed = JSON.parse(text) as unknown;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch (err) {
+      throw new Error(
+        `watch subscription received non-JSON payload: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    }
     if (this.options.shouldHandle(parsed)) {
       this.options.onMessage(parsed);
     }

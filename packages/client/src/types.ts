@@ -13,6 +13,12 @@ export interface XianClientOptions {
   chainId?: string;
   fetchFn?: typeof fetch;
   webSocketFactory?: XianWebSocketFactory;
+  /**
+   * Default timeout, in milliseconds, applied to each HTTP request the
+   * client makes. Callers can override or disable per-call via options.
+   * Defaults to 30_000 ms. Set to 0 or a negative value to disable.
+   */
+  requestTimeoutMs?: number;
 }
 
 export interface BuildTxRequest {
@@ -100,6 +106,15 @@ export interface XianTokenBalancesResult {
   offset: number;
 }
 
+/**
+ * Canonical unsigned Xian transaction payload.
+ *
+ * An identical definition lives in ``@xian-tech/provider`` (see
+ * ``packages/provider/src/provider.ts``) because the two packages don't
+ * depend on each other — the provider package describes the wallet-facing
+ * contract and must stay lightweight. When changing the shape here, update
+ * the provider copy in the same commit.
+ */
 export interface XianTxPayload {
   chain_id: string;
   contract: string;
@@ -171,6 +186,11 @@ export interface XianShieldedRelayerClientOptions {
   relayerUrl: string;
   authToken?: string;
   fetchFn?: typeof fetch;
+  /**
+   * Default timeout, in milliseconds, applied to relayer HTTP requests.
+   * Defaults to 30_000 ms. Set to 0 or a negative value to disable.
+   */
+  requestTimeoutMs?: number;
 }
 
 export type XianShieldedRelayKind =

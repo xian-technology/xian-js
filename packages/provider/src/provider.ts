@@ -16,6 +16,15 @@ export interface XianSigner {
   signMessage(message: string): Promise<string> | string;
 }
 
+/**
+ * Canonical unsigned Xian transaction payload.
+ *
+ * An identical definition lives in ``@xian-tech/client`` (see
+ * ``packages/client/src/types.ts``) because the two packages don't depend
+ * on each other — this one describes the wallet-facing contract and must
+ * stay lightweight. When changing the shape here, update the client copy
+ * in the same commit.
+ */
 export interface XianTxPayload {
   chain_id: string;
   contract: string;
