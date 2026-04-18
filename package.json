@@ -13,8 +13,8 @@
     "examples/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspace @xian-tech/types && npm run build --workspaces --if-present",
+    "typecheck": "npm run build --workspace @xian-tech/types && npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "validate": "npm run typecheck && npm run build && npm run test"
   },

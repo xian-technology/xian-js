@@ -4,47 +4,25 @@ import {
   ProviderUnauthorizedError,
   ProviderUnsupportedMethodError
 } from "./errors";
+import type {
+  BroadcastMode,
+  XianNumber,
+  XianSignedTransaction,
+  XianSigner,
+  XianTxPayload,
+  XianUnsignedTransaction
+} from "@xian-tech/types";
+
+export type {
+  BroadcastMode,
+  XianNumber,
+  XianSignedTransaction,
+  XianSigner,
+  XianTxPayload,
+  XianUnsignedTransaction
+} from "@xian-tech/types";
 
 type Listener = (...args: unknown[]) => void;
-
-export type BroadcastMode = "async" | "checktx" | "commit";
-
-export type XianNumber = number | bigint;
-
-export interface XianSigner {
-  getAddress?(): Promise<string> | string;
-  signMessage(message: string): Promise<string> | string;
-}
-
-/**
- * Canonical unsigned Xian transaction payload.
- *
- * An identical definition lives in ``@xian-tech/client`` (see
- * ``packages/client/src/types.ts``) because the two packages don't depend
- * on each other — this one describes the wallet-facing contract and must
- * stay lightweight. When changing the shape here, update the client copy
- * in the same commit.
- */
-export interface XianTxPayload {
-  chain_id: string;
-  contract: string;
-  function: string;
-  kwargs: Record<string, unknown>;
-  nonce: XianNumber;
-  sender: string;
-  chi_supplied: XianNumber;
-}
-
-export interface XianUnsignedTransaction {
-  payload: XianTxPayload;
-}
-
-export interface XianSignedTransaction {
-  payload: XianTxPayload;
-  metadata: {
-    signature: string;
-  };
-}
 
 export interface TransactionSubmission {
   submitted: boolean;

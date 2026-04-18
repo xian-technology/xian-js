@@ -1,18 +1,21 @@
 {
-  "name": "@xian-tech/provider",
+  "name": "@xian-tech/types",
   "version": "0.1.6",
-  "description": "Xian browser wallet provider contract and reference provider",
+  "description": "Shared TypeScript types used across the Xian JS workspace",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/xian-technology/xian-js.git",
-    "directory": "packages/provider"
+    "directory": "packages/types"
   },
   "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "publishConfig": {
@@ -24,8 +27,5 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json"
-  },
-  "dependencies": {
-    "@xian-tech/types": "0.1.6"
   }
 }

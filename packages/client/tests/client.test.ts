@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { base64ToUtf8 } from "../src/encoding";
 import {
   Ed25519Signer,
   shieldedSyncHintFromViewingPublicKey,
@@ -476,6 +477,63 @@ describe("@xian-tech/client", () => {
     ).toBe("0x2d0f3fbca5001e8d629dc630");
   });
 
+  it("falls back to Buffer decoding when atob is unavailable", () => {
+    const originalAtob = globalThis.atob;
+    Object.defineProperty(globalThis, "atob", {
+      value: undefined,
+      configurable: true,
+      writable: true
+    });
+
+    try {
+      const payload = Buffer.from("hello from buffer", "utf-8").toString("base64");
+      expect(base64ToUtf8(payload)).toBe("hello from buffer");
+    } finally {
+      Object.defineProperty(globalThis, "atob", {
+        value: originalAtob,
+        configurable: true,
+        writable: true
+      });
+    }
+  });
+
+  it("rejects oversized chi estimates instead of truncating them", async () => {
+    const fetchFn = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/abci_query") && url.includes("simulate_tx")) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8(
+                JSON.stringify({
+                  status: 0,
+                  result: "ok",
+                  chi_used: "9007199254740993"
+                })
+              )
+            }
+          }
+        });
+      }
+      throw new Error(`unexpected URL: ${url}`);
+    }) as typeof fetch;
+
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn
+    });
+
+    await expect(
+      client.estimateChi({
+        sender: "a".repeat(64),
+        contract: "currency",
+        function: "transfer",
+        kwargs: { to: "bob", amount: 1 }
+      })
+    ).rejects.toThrow(/Number\.MAX_SAFE_INTEGER/);
+  });
+
   it("waits until a transaction lookup stops returning a pending error", async () => {
     let attempts = 0;
     const fetchFn = vi.fn(async (input: string | URL) => {
@@ -515,6 +573,84 @@ describe("@xian-tech/client", () => {
     expect(receipt.success).toBe(true);
     expect(receipt.txHash).toBe("ABC123");
     expect(attempts).toBe(2);
+  });
+
+  it("surfaces malformed websocket payloads through onError", async () => {
+    const sentMessages: string[] = [];
+    const sockets: FakeSocket[] = [];
+    const webSocketFactory = vi.fn((url: string) => {
+      const socket = new FakeSocket(url, sentMessages);
+      sockets.push(socket);
+      return socket;
+    });
+    const onError = vi.fn();
+
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      dashboardUrl: "http://127.0.0.1:8080",
+      fetchFn: vi.fn() as unknown as typeof fetch,
+      webSocketFactory
+    });
+
+    const subscription = client.watch.state(
+      "currency.balances:*",
+      () => {},
+      { onError }
+    );
+
+    sockets[0]?.open();
+    await sockets[0]?.message("not json");
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
+    expect((onError.mock.calls[0]?.[0] as Error).message).toContain("non-JSON");
+
+    await subscription.unsubscribe();
+  });
+
+  it("surfaces async watch listener failures through onError", async () => {
+    const sentMessages: string[] = [];
+    const sockets: FakeSocket[] = [];
+    const webSocketFactory = vi.fn((url: string) => {
+      const socket = new FakeSocket(url, sentMessages);
+      sockets.push(socket);
+      return socket;
+    });
+    const onError = vi.fn();
+    const listener = vi.fn(async () => {
+      throw new Error("listener failed");
+    });
+
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      dashboardUrl: "http://127.0.0.1:8080",
+      fetchFn: vi.fn() as unknown as typeof fetch,
+      webSocketFactory
+    });
+
+    const subscription = client.watch.state(
+      "currency.balances:*",
+      listener,
+      { onError }
+    );
+
+    sockets[0]?.open();
+    await sockets[0]?.message(
+      JSON.stringify({
+        type: "state_change",
+        key: "currency.balances:alice",
+        value: "10"
+      })
+    );
+    await Promise.resolve();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect((onError.mock.calls[0]?.[0] as Error).message).toContain(
+      "listener failed"
+    );
+
+    await subscription.unsubscribe();
   });
 });
 

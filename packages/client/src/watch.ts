@@ -5,6 +5,7 @@ import type {
   XianContractEventMessage,
   XianStateChangeMessage,
   XianWatchEventFilter,
+  XianWatchOptions,
   XianWebSocketFactory,
   XianWebSocketLike
 } from "./types.js";
@@ -19,7 +20,7 @@ interface ManagedSubscriptionOptions<TMessage> {
   webSocketFactory: XianWebSocketFactory;
   subscribeMessage?: Record<string, unknown>;
   shouldHandle(message: unknown): message is TMessage;
-  onMessage(message: TMessage): void;
+  onMessage(message: TMessage): void | Promise<void>;
   /** Optional callback for malformed/unparseable messages. */
   onError?(error: Error): void;
 }
@@ -108,7 +109,7 @@ class ManagedSubscription<TMessage> implements WatchSubscription {
       );
     }
     if (this.options.shouldHandle(parsed)) {
-      this.options.onMessage(parsed);
+      await this.options.onMessage(parsed);
     }
   }
 
@@ -158,16 +159,24 @@ export class WatchApi {
     return `${this.options.dashboardUrl.replace(/\/+$/, "")}/ws`;
   }
 
-  blocks(listener: (message: XianBlockMessage) => void): WatchSubscription {
+  blocks(
+    listener: (message: XianBlockMessage) => void | Promise<void>,
+    options?: XianWatchOptions
+  ): WatchSubscription {
     return new ManagedSubscription({
       url: this.socketUrl(),
       webSocketFactory: this.webSocketFactory,
       shouldHandle: isBlockMessage,
-      onMessage: listener
+      onMessage: listener,
+      onError: options?.onError
     });
   }
 
-  state(key: string, listener: (message: XianStateChangeMessage) => void): WatchSubscription {
+  state(
+    key: string,
+    listener: (message: XianStateChangeMessage) => void | Promise<void>,
+    options?: XianWatchOptions
+  ): WatchSubscription {
     return new ManagedSubscription({
       url: this.socketUrl(),
       webSocketFactory: this.webSocketFactory,
@@ -177,11 +186,16 @@ export class WatchApi {
         key
       },
       shouldHandle: isStateChangeMessage,
-      onMessage: listener
+      onMessage: listener,
+      onError: options?.onError
     });
   }
 
-  events(filter: XianWatchEventFilter, listener: (message: XianContractEventMessage) => void): WatchSubscription {
+  events(
+    filter: XianWatchEventFilter,
+    listener: (message: XianContractEventMessage) => void | Promise<void>,
+    options?: XianWatchOptions
+  ): WatchSubscription {
     return new ManagedSubscription({
       url: this.socketUrl(),
       webSocketFactory: this.webSocketFactory,
@@ -192,7 +206,8 @@ export class WatchApi {
         ...(filter.event ? { event: filter.event } : {})
       },
       shouldHandle: isContractEventMessage,
-      onMessage: listener
+      onMessage: listener,
+      onError: options?.onError
     });
   }
 }

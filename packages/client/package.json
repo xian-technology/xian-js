@@ -29,6 +29,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@xian-tech/types": "0.1.6",
     "@noble/hashes": "^1.8.0",
     "tweetnacl": "^1.0.3"
   }
