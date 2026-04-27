@@ -16,6 +16,7 @@
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@xian-tech/client": ["packages/client/src/index.ts"],
       "@xian-tech/provider": ["packages/provider/src/index.ts"]

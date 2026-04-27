@@ -1,4 +1,4 @@
-import { sha3_256 } from "@noble/hashes/sha3";
+import { sha3_256 } from "@noble/hashes/sha3.js";
 
 import { bytesToHex, hexToBytes, utf8ToBytes } from "./encoding.js";
 import { publicKeyFromPrivateKey } from "./ed25519.js";
