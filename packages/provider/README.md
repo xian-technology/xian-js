@@ -44,3 +44,14 @@ It does not own:
 
 - framework bindings
 - production wallet custody flows
+
+```mermaid
+flowchart LR
+  Wallet["Wallet implementation"] --> Register["registerInjectedXianProvider"]
+  Register --> Namespace["window.xian and window.xianProviders"]
+  Dapp["Dapp"] --> Discovery["InjectedXianWallet discovery"]
+  Discovery --> Namespace
+  Dapp --> Request["provider.request"]
+  Request --> Wallet
+  Wallet --> Client["@xian-tech/client"]
+```

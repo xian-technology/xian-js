@@ -35,3 +35,14 @@ The example includes two wallet-specific actions:
 - `Inject Demo Wallet`: registers the in-memory provider into the browser
   namespace as if a wallet extension had injected it
 - `Use Injected Wallet`: rebinds the app to the discovered injected wallet path
+
+```mermaid
+flowchart LR
+  App["Browser example"] --> DemoWallet["In-memory demo wallet"]
+  DemoWallet --> Inject["Inject Demo Wallet"]
+  Inject --> Namespace["window.xian namespace"]
+  App --> Discover["Use Injected Wallet"]
+  Discover --> Namespace
+  App --> Client["XianClient"]
+  Client --> Node["Xian RPC and dashboard"]
+```

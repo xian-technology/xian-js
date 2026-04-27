@@ -14,3 +14,13 @@ Dependency direction:
 
 - `provider/` may depend on the client contract
 - `client/` must remain provider-agnostic
+
+```mermaid
+flowchart LR
+  Client["packages/client"] --> RPC["Xian RPC and websockets"]
+  Provider["packages/provider"] --> Client
+  Example["examples/browser-dapp"] --> Provider
+  Example --> Client
+  WalletProduct["xian-wallet-browser"] --> Provider
+  WalletProduct --> Client
+```

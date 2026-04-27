@@ -10,6 +10,21 @@ The repo is a TypeScript monorepo. Packages publish independently under the
 [`xian-wallet-browser`](../xian-wallet-browser) repo; this repo provides the
 SDK and provider primitives that wallet implementations depend on.
 
+## Workspace Shape
+
+```mermaid
+flowchart LR
+  Dapp["Dapp"] --> Provider["Injected wallet provider"]
+  Provider --> WalletProduct["Browser wallet product"]
+  Dapp --> Client["@xian-tech/client"]
+  WalletProduct --> Client
+  Client --> RPC["Xian RPC and dashboard websockets"]
+  Packages["@xian-tech packages"] --> Client
+  Packages --> Provider
+  Examples["Examples"] --> Provider
+  Examples --> Client
+```
+
 ## Quick Start
 
 ```bash

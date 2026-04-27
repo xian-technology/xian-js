@@ -14,3 +14,15 @@ It does not own:
 - browser wallet discovery
 - wallet-provider event contracts
 - framework-specific bindings
+
+```mermaid
+flowchart LR
+  App["JS or TS app"] --> Client["XianClient"]
+  Client --> Queries["ABCI and HTTP queries"]
+  Client --> Tx["Build, sign, and broadcast tx"]
+  Client --> Watch["Websocket subscriptions"]
+  Signer["Ed25519Signer"] --> Tx
+  Queries --> Node["Xian node"]
+  Tx --> Node
+  Watch --> Dashboard["Dashboard websocket"]
+```
