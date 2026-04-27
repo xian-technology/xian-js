@@ -27,21 +27,5 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --audit-level=critical --omit=dev
 
-      - name: Install Rollup Linux native package
-        run: |
-          node <<'NODE'
-          const { execFileSync } = require("node:child_process");
-          const { arch, platform } = process;
-
-          if (platform === "linux" && arch === "x64") {
-            const version = require("./node_modules/rollup/package.json").version;
-            execFileSync(
-              "npm",
-              ["install", "--no-save", `@rollup/rollup-linux-x64-gnu@${version}`],
-              { stdio: "inherit" }
-            );
-          }
-          NODE
-
       - name: Validate workspace
         run: npm run validate
