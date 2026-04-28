@@ -52,4 +52,25 @@ describe("@xian-tech/client encoding", () => {
     expect(signature).toHaveLength(128);
     expect(verifyMessage(signer.address, message, signature)).toBe(true);
   });
+
+  it("canonicalizes unicode without ASCII escaping", () => {
+    const canonical = canonicalizeRuntime({
+      kwargs: { memo: "snowman: \u2603" }
+    });
+
+    expect(canonical).toBe('{"kwargs":{"memo":"snowman: ☃"}}');
+  });
+
+  it("canonicalizes runtime wrappers without decoding them", () => {
+    const canonical = canonicalizeRuntime({
+      kwargs: {
+        amount: { __fixed__: "0.5" },
+        units: 2n ** 80n
+      }
+    });
+
+    expect(canonical).toBe(
+      '{"kwargs":{"amount":{"__fixed__":"0.5"},"units":{"__big_int__":"1208925819614629174706176"}}}'
+    );
+  });
 });

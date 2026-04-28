@@ -99,6 +99,66 @@ describe("@xian-tech/client", () => {
     expect(submission.txHash).toBe("ABC123");
   });
 
+  it("rejects transaction kwargs floats before signing", async () => {
+    const signer = new Ed25519Signer("2".repeat(64));
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn: vi.fn() as unknown as typeof fetch,
+      chainId: "xian-local"
+    });
+
+    await expect(
+      client.buildTx({
+        sender: signer.address,
+        contract: "currency",
+        function: "transfer",
+        kwargs: { to: "bob", amount: 1.5 },
+        nonce: 1,
+        chi: 50_000
+      })
+    ).rejects.toThrow(/kwargs values/);
+  });
+
+  it("rejects non-object transaction kwargs before signing", async () => {
+    const signer = new Ed25519Signer("2".repeat(64));
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn: vi.fn() as unknown as typeof fetch,
+      chainId: "xian-local"
+    });
+
+    await expect(
+      client.buildTx({
+        sender: signer.address,
+        contract: "currency",
+        function: "transfer",
+        kwargs: [] as unknown as Record<string, unknown>,
+        nonce: 1,
+        chi: 50_000
+      })
+    ).rejects.toThrow(/kwargs must be an object/);
+  });
+
+  it("rejects unsafe transaction integer fields", async () => {
+    const signer = new Ed25519Signer("2".repeat(64));
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn: vi.fn() as unknown as typeof fetch,
+      chainId: "xian-local"
+    });
+
+    await expect(
+      client.buildTx({
+        sender: signer.address,
+        contract: "currency",
+        function: "transfer",
+        kwargs: { to: "bob", amount: 1 },
+        nonce: BigInt(Number.MAX_SAFE_INTEGER) + 1n,
+        chi: 50_000
+      })
+    ).rejects.toThrow(/nonce/);
+  });
+
   it("subscribes to state changes over websocket", async () => {
     const sentMessages: string[] = [];
     const sockets: FakeSocket[] = [];

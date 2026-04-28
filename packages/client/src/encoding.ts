@@ -147,9 +147,7 @@ export function decodeRuntime<T = unknown>(value: string | Uint8Array | null | u
 }
 
 export function canonicalizeRuntime(value: unknown): string {
-  const sorted = sortKeysDeep(value);
-  const roundTripped = decodeRuntime(encodeRuntime(sorted));
-  return encodeRuntime(roundTripped);
+  return encodeRuntime(sortKeysDeep(value));
 }
 
 export function parseXianNumber(value: string): number | bigint {

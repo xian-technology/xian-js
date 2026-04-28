@@ -44,6 +44,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_POLL_INTERVAL_MS = 500;
 const DEFAULT_CHI_MARGIN = 0.2;
 const DEFAULT_MIN_CHI_HEADROOM = 5_000;
+const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 
 function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
@@ -59,9 +60,9 @@ function isIdentifier(value: string): boolean {
 
 function isNonNegativeInteger(value: unknown): value is number | bigint {
   if (typeof value === "bigint") {
-    return value >= 0n;
+    return value >= 0n && value <= MAX_SAFE_BIGINT;
   }
-  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
 function isHexKey(value: string): boolean {
@@ -85,6 +86,32 @@ function asRecord(value: unknown): Record<string, unknown> {
     throw new TransportError("expected object response");
   }
   return value as Record<string, unknown>;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Object.prototype.toString.call(value) === "[object Object]";
+}
+
+function validateTransactionJsonValue(value: unknown): boolean {
+  if (value == null || typeof value === "string" || typeof value === "boolean") {
+    return true;
+  }
+  if (typeof value === "bigint") {
+    return true;
+  }
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value);
+  }
+  if (value instanceof Uint8Array) {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.every((item) => validateTransactionJsonValue(item));
+  }
+  if (isPlainObject(value)) {
+    return Object.values(value).every((item) => validateTransactionJsonValue(item));
+  }
+  return false;
 }
 
 function parseJsonResult(value: string): unknown {
@@ -228,10 +255,16 @@ function validatePayload(payload: XianTxPayload): void {
     throw new TransactionError("chi_supplied must be a non-negative integer");
   }
 
+  if (!isPlainObject(payload.kwargs)) {
+    throw new TransactionError("kwargs must be an object");
+  }
   for (const key of Object.keys(payload.kwargs)) {
     if (!isIdentifier(key)) {
       throw new TransactionError("kwargs keys must be valid identifiers");
     }
+  }
+  if (!validateTransactionJsonValue(payload.kwargs)) {
+    throw new TransactionError("kwargs values must be JSON-compatible transaction values");
   }
 }
 
