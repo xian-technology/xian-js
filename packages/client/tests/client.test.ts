@@ -99,6 +99,46 @@ describe("@xian-tech/client", () => {
     expect(submission.txHash).toBe("ABC123");
   });
 
+  it("uses exact simulated chi when building a transaction without manual chi", async () => {
+    const signer = new Ed25519Signer("2".repeat(64));
+    const fetchFn = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/abci_query") && url.includes("simulate_tx")) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8(
+                JSON.stringify({
+                  status: 0,
+                  result: "ok",
+                  chi_used: 12_000
+                })
+              )
+            }
+          }
+        });
+      }
+      throw new Error(`unexpected URL: ${url}`);
+    }) as typeof fetch;
+
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn,
+      chainId: "xian-local"
+    });
+
+    const tx = await client.buildTx({
+      sender: signer.address,
+      contract: "currency",
+      function: "transfer",
+      kwargs: { to: "bob", amount: 1 },
+      nonce: 1
+    });
+
+    expect(tx.payload.chi_supplied).toBe(12_000);
+  });
+
   it("rejects transaction kwargs floats before signing", async () => {
     const signer = new Ed25519Signer("2".repeat(64));
     const client = new XianClient({
@@ -592,6 +632,42 @@ describe("@xian-tech/client", () => {
         kwargs: { to: "bob", amount: 1 }
       })
     ).rejects.toThrow(/Number\.MAX_SAFE_INTEGER/);
+  });
+
+  it("rejects simulation responses without a chi estimate", async () => {
+    const fetchFn = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/abci_query") && url.includes("simulate_tx")) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8(
+                JSON.stringify({
+                  status: 0,
+                  result: "ok"
+                })
+              )
+            }
+          }
+        });
+      }
+      throw new Error(`unexpected URL: ${url}`);
+    }) as typeof fetch;
+
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn
+    });
+
+    await expect(
+      client.estimateChi({
+        sender: "a".repeat(64),
+        contract: "currency",
+        function: "transfer",
+        kwargs: { to: "b".repeat(64), amount: 1 }
+      })
+    ).rejects.toThrow(/missing chi_used/);
   });
 
   it("waits until a transaction lookup stops returning a pending error", async () => {

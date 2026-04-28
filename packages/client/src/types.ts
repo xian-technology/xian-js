@@ -127,14 +127,8 @@ export interface WaitForTxOptions {
   pollIntervalMs?: number;
 }
 
-export interface EstimateChiOptions {
-  chiMargin?: number;
-  minChiHeadroom?: number;
-}
-
 export interface EstimateChiResult {
   estimated: number;
-  suggested: number;
   simulation: Record<string, unknown>;
 }
 

@@ -18,7 +18,6 @@ import type {
   BroadcastTxOptions,
   BuildTxRequest,
   ContractSendOptions,
-  EstimateChiOptions,
   EstimateChiResult,
   GetShieldedWalletHistoryOptions,
   GetTokenBalancesOptions,
@@ -42,8 +41,6 @@ import type {
 const EMPTY_ABCI_VALUE = "AA==";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_POLL_INTERVAL_MS = 500;
-const DEFAULT_CHI_MARGIN = 0.2;
-const DEFAULT_MIN_CHI_HEADROOM = 5_000;
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 
 function stripTrailingSlash(value: string): string {
@@ -157,11 +154,11 @@ function coerceChiEstimate(value: unknown): number {
     return value;
   }
   if (value == null) {
-    return 0;
+    throw new Error("simulation response is missing chi_used");
   }
   const raw = String(value).trim();
   if (raw === "") {
-    return 0;
+    throw new Error("simulation response has empty chi_used");
   }
   try {
     const parsed = parseXianNumber(raw);
@@ -689,20 +686,12 @@ export class XianClient {
     return simulation.result;
   }
 
-  async estimateChi(
-    request: SimulateRequest,
-    options?: EstimateChiOptions
-  ): Promise<EstimateChiResult> {
+  async estimateChi(request: SimulateRequest): Promise<EstimateChiResult> {
     const simulation = await this.simulate(request);
     const estimated = coerceChiEstimate(simulation.chi_used);
-    const chiMargin = options?.chiMargin ?? DEFAULT_CHI_MARGIN;
-    const minChiHeadroom = options?.minChiHeadroom ?? DEFAULT_MIN_CHI_HEADROOM;
-    const proportional = Math.ceil(estimated * chiMargin);
-    const suggested = estimated + Math.max(proportional, minChiHeadroom);
 
     return {
       estimated,
-      suggested,
       simulation
     };
   }
@@ -719,7 +708,7 @@ export class XianClient {
         function: request.function,
         kwargs: request.kwargs
       });
-      chiSupplied = estimate.suggested;
+      chiSupplied = estimate.estimated;
     }
 
     const payload = sortKeysDeep({
