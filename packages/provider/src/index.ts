@@ -41,3 +41,28 @@ export {
   ProviderUnsupportedMethodError,
   XianProviderError
 } from "./errors";
+export {
+  WalletConnectXianProvider,
+  type WalletConnectRequestClient,
+  type WalletConnectXianProviderOptions
+} from "./walletconnect";
+export {
+  XIAN_WALLETCONNECT_EVENTS,
+  XIAN_WALLETCONNECT_METHODS,
+  XIAN_WALLETCONNECT_NAMESPACE,
+  createXianDappPolicyForRequest,
+  evaluateXianDappPolicy,
+  findMatchingXianDappPolicy,
+  parseXianDappAction,
+  xianAccountFromCaip10,
+  xianAccountToCaip10,
+  xianChainIdFromCaip2,
+  xianChainIdToCaip2,
+  type XianAutoApproveMethod,
+  type XianDappAction,
+  type XianDappPolicy,
+  type XianDappPolicyMatch,
+  type XianDappRequestContext,
+  type XianWalletConnectEvent,
+  type XianWalletConnectMethod
+} from "./permissions";
