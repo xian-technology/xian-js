@@ -115,7 +115,21 @@ jobs:
 
       - name: Publish packages to npm
         run: |
-          for package in release-dist/*.tgz; do
+          for package in \
+            release-dist/xian-tech-types-*.tgz \
+            release-dist/xian-tech-client-*.tgz \
+            release-dist/xian-tech-provider-*.tgz
+          do
+            metadata="$(
+              tar -xOf "$package" package/package.json \
+                | node -e 'let input = ""; process.stdin.on("data", chunk => input += chunk); process.stdin.on("end", () => { const pkg = JSON.parse(input); console.log(`${pkg.name}\t${pkg.version}`); });'
+            )"
+            name="${metadata%%$'\t'*}"
+            version="${metadata#*$'\t'}"
+            if npm view "${name}@${version}" version >/dev/null 2>&1; then
+              echo "${name}@${version} is already published; skipping"
+              continue
+            fi
             npm publish "./$package" --provenance --access public
           done
 
