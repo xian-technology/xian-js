@@ -14,18 +14,46 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    defaults:
+      run:
+        working-directory: xian-js
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          path: xian-js
+
+      - name: Check out xian-contracting
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/xian-contracting
+          ref: main
+          path: xian-contracting
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: |
+          if ! command -v wasm-pack >/dev/null 2>&1; then
+            cargo install wasm-pack --version 0.14.0 --locked
+          fi
+          wasm-pack --version
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: npm
+          cache-dependency-path: xian-js/package-lock.json
 
       - name: Install dependencies
         run: npm install
+
+      - name: Build shared compiler
+        run: npm run build:compiler
 
       - name: Validate workspace
         run: npm run validate
@@ -61,7 +89,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: release-dist
-          path: release-dist/*
+          path: xian-js/release-dist/*
           if-no-files-found: error
           retention-days: 14
 
