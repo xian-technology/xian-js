@@ -37,6 +37,7 @@ jobs:
 
           const expected = process.env.GITHUB_REF_NAME.replace(/^v/, "");
           const packageFiles = [
+            "packages/types/package.json",
             "packages/client/package.json",
             "packages/provider/package.json"
           ];
@@ -52,6 +53,7 @@ jobs:
       - name: Pack published packages
         run: |
           mkdir -p release-dist
+          npm pack --workspace @xian-tech/types --pack-destination release-dist
           npm pack --workspace @xian-tech/client --pack-destination release-dist
           npm pack --workspace @xian-tech/provider --pack-destination release-dist
 
