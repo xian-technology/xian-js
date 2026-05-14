@@ -32,5 +32,13 @@
     "@xian-tech/types": "0.1.6",
     "@noble/hashes": "^2.2.0",
     "tweetnacl": "^1.0.3"
+  },
+  "peerDependencies": {
+    "@xian-tech/compiler": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@xian-tech/compiler": {
+      "optional": true
+    }
   }
 }

@@ -151,6 +151,34 @@ const submission = await client.token("currency").transfer({
 console.log(submission.txHash, submission.accepted, submission.finalized);
 ```
 
+Submit prebuilt contract deployment artifacts:
+
+```ts
+const submission = await client.submitContract({
+  name: "con_counter",
+  deploymentArtifacts,
+  signer,
+  mode: "checktx",
+  waitForTx: true,
+});
+```
+
+Compile and deploy contract source when `@xian-tech/compiler` is installed:
+
+```ts
+const submission = await client.deployContract({
+  name: "con_counter",
+  source,
+  signer,
+  mode: "checktx",
+  waitForTx: true,
+});
+```
+
+Use `submitContract` when you already have deployment artifacts, or inject a
+compiler into `deployContract` in environments that manage the compiler module
+themselves.
+
 Use an injected wallet when a dapp must not see private keys:
 
 ```ts

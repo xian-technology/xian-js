@@ -41,6 +41,51 @@ export interface BuildTxRequest {
   chiSupplied?: XianNumber;
 }
 
+export interface ContractDeploymentArtifacts {
+  format: string;
+  module_name?: string;
+  vm_profile?: string;
+  source?: string;
+  vm_ir_json?: string;
+  hashes?: Record<string, string>;
+  [key: string]: unknown;
+}
+
+export interface SubmitContractOptions {
+  name: string;
+  deploymentArtifacts: ContractDeploymentArtifacts;
+  signer: XianSigner;
+  args?: Record<string, unknown>;
+  mode?: BroadcastMode;
+  waitForTx?: boolean;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+  chi?: XianNumber;
+  nonce?: XianNumber;
+  chainId?: string;
+}
+
+export interface XianContractCompiler {
+  compileContractArtifact?: (
+    moduleName: string,
+    source: string,
+    options?: { vmProfile?: string; lint?: boolean }
+  ) => ContractDeploymentArtifacts | Promise<ContractDeploymentArtifacts>;
+  compileContractArtifactJson?: (
+    moduleName: string,
+    source: string,
+    optionsJson?: string
+  ) => string | Promise<string>;
+}
+
+export interface DeployContractOptions
+  extends Omit<SubmitContractOptions, "deploymentArtifacts"> {
+  source: string;
+  compiler?: XianContractCompiler;
+  lint?: boolean;
+  vmProfile?: string;
+}
+
 export interface SimulateRequest {
   sender: string;
   contract: string;

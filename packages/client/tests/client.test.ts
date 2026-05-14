@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { base64ToUtf8 } from "../src/encoding";
+import {
+  base64ToUtf8,
+  bytesToUtf8,
+  decodeRuntime,
+  hexToBytes
+} from "../src/encoding";
 import {
   Ed25519Signer,
   shieldedSyncHintFromViewingPublicKey,
@@ -97,6 +102,163 @@ describe("@xian-tech/client", () => {
     expect(submission.submitted).toBe(true);
     expect(submission.accepted).toBe(true);
     expect(submission.txHash).toBe("ABC123");
+  });
+
+  it("submits prebuilt contract deployment artifacts", async () => {
+    const signer = new Ed25519Signer("2".repeat(64));
+    let signedPayload: Record<string, unknown> | null = null;
+    const fetchFn = vi.fn(async (input: string | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/broadcast_tx_sync")) {
+        const encoded = JSON.parse(url.searchParams.get("tx") ?? "\"\"");
+        const signed = decodeRuntime<Record<string, unknown>>(
+          bytesToUtf8(hexToBytes(encoded))
+        );
+        signedPayload = signed?.payload as Record<string, unknown>;
+        return jsonResponse({
+          result: {
+            hash: "DEPLOY123",
+            code: 0
+          }
+        });
+      }
+      throw new Error(`unexpected URL: ${String(input)}`);
+    }) as typeof fetch;
+
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn,
+      chainId: "xian-local"
+    });
+
+    const submission = await client.submitContract({
+      name: "con_counter",
+      deploymentArtifacts: {
+        format: "xian_contract_artifact_v1",
+        module_name: "con_counter",
+        vm_profile: "xian_vm_v1",
+        source: "counter = Variable()\n",
+        vm_ir_json: "{}",
+        hashes: {
+          source_sha256: "source",
+          vm_ir_sha256: "ir"
+        }
+      },
+      args: { initial: 7 },
+      signer,
+      nonce: 1,
+      chi: 50_000,
+      mode: "checktx"
+    });
+
+    expect(submission.txHash).toBe("DEPLOY123");
+    expect(signedPayload).toMatchObject({
+      chain_id: "xian-local",
+      contract: "submission",
+      function: "submit_contract",
+      nonce: 1,
+      sender: signer.address,
+      chi_supplied: 50_000,
+      kwargs: {
+        name: "con_counter",
+        constructor_args: { initial: 7 },
+        deployment_artifacts: {
+          format: "xian_contract_artifact_v1",
+          module_name: "con_counter",
+          vm_profile: "xian_vm_v1"
+        }
+      }
+    });
+  });
+
+  it("deploys contract source through an injected compiler", async () => {
+    const signer = new Ed25519Signer("2".repeat(64));
+    let signedPayload: Record<string, unknown> | null = null;
+    const fetchFn = vi.fn(async (input: string | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/broadcast_tx_sync")) {
+        const encoded = JSON.parse(url.searchParams.get("tx") ?? "\"\"");
+        const signed = decodeRuntime<Record<string, unknown>>(
+          bytesToUtf8(hexToBytes(encoded))
+        );
+        signedPayload = signed?.payload as Record<string, unknown>;
+        return jsonResponse({
+          result: {
+            hash: "DEPLOY456",
+            code: 0
+          }
+        });
+      }
+      throw new Error(`unexpected URL: ${String(input)}`);
+    }) as typeof fetch;
+    const compiler = {
+      compileContractArtifact: vi.fn(() => ({
+        format: "xian_contract_artifact_v1",
+        module_name: "con_counter",
+        vm_profile: "xian_vm_v1",
+        source: "@export\ndef get():\n    return 1",
+        vm_ir_json: "{}",
+        hashes: {
+          source_sha256: "source",
+          vm_ir_sha256: "ir"
+        }
+      }))
+    };
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn,
+      chainId: "xian-local"
+    });
+
+    const submission = await client.deployContract({
+      name: "con_counter",
+      source: "@export\ndef get():\n    return 1\n",
+      compiler,
+      signer,
+      nonce: 1,
+      chi: 50_000,
+      mode: "checktx"
+    });
+
+    expect(submission.txHash).toBe("DEPLOY456");
+    expect(compiler.compileContractArtifact).toHaveBeenCalledWith(
+      "con_counter",
+      "@export\ndef get():\n    return 1\n",
+      { lint: true, vmProfile: "xian_vm_v1" }
+    );
+    expect(signedPayload).toMatchObject({
+      function: "submit_contract",
+      kwargs: {
+        name: "con_counter",
+        deployment_artifacts: {
+          format: "xian_contract_artifact_v1",
+          module_name: "con_counter",
+          vm_profile: "xian_vm_v1"
+        }
+      }
+    });
+  });
+
+  it("rejects runtime contract deployment artifacts", async () => {
+    const signer = new Ed25519Signer("2".repeat(64));
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn: vi.fn() as unknown as typeof fetch,
+      chainId: "xian-local"
+    });
+
+    await expect(
+      client.submitContract({
+        name: "con_counter",
+        deploymentArtifacts: {
+          format: "xian_contract_artifact_v1",
+          runtime_code: "compiled"
+        },
+        signer,
+        nonce: 1,
+        chi: 50_000
+      })
+    ).rejects.toThrow(/runtime_code/);
   });
 
   it("uses exact simulated chi when building a transaction without manual chi", async () => {

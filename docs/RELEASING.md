@@ -22,6 +22,22 @@ This repo is not lockstepped with `xian-wallet-browser`.
 - when the wallet repo needs a newer SDK release, it updates its dependency
   versions explicitly and then ships its own tag
 
+## Next Breaking SDK Release
+
+The VM-only runtime cleanup is a breaking SDK release. The old
+`getContract(...)` alias has been removed from `@xian-tech/client`. Consumers
+must use the explicit artifact APIs:
+
+- `getContractSource(contract)` for canonical contract source
+- `getContractIr(contract)` for Xian VM IR
+
+Release checklist:
+
+- tag as the next breaking pre-1.0 version, for example `v0.2.0`
+- update every publishable package version to the tag version before tagging
+- call out the removed `getContract(...)` alias in release notes
+- update downstream examples and wallet dependencies before publishing
+
 ## Tag Workflow
 
 1. Update `packages/client/package.json` and `packages/provider/package.json`

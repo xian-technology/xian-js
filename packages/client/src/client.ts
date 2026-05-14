@@ -10,6 +10,7 @@ import {
   sortKeysDeep,
   utf8ToBytes
 } from "./encoding.js";
+import { compileContractArtifacts } from "./compiler.js";
 import { isValidEd25519Signature } from "./ed25519.js";
 import { AbciError, RpcError, SimulationError, TransactionError, TransportError, TxTimeoutError } from "./errors.js";
 import { WatchApi } from "./watch.js";
@@ -18,6 +19,8 @@ import type {
   BroadcastTxOptions,
   BuildTxRequest,
   ContractSendOptions,
+  DeployContractOptions,
+  SubmitContractOptions,
   EstimateChiResult,
   GetShieldedWalletHistoryOptions,
   GetTokenBalancesOptions,
@@ -600,8 +603,8 @@ export class XianClient {
     return parseXianNumber(String(value));
   }
 
-  async getContract(contract: string): Promise<string | null> {
-    const data = await this.abciQuery(`/contract/${contract}`);
+  async getContractSource(contract: string): Promise<string | null> {
+    const data = await this.abciQuery(`/contract_source/${contract}`);
     const value = asRecord(asRecord(data.result).response).value;
     if (value == null || value === EMPTY_ABCI_VALUE) {
       return null;
@@ -609,8 +612,8 @@ export class XianClient {
     return base64ToUtf8(String(value));
   }
 
-  async getContractCode(contract: string): Promise<string | null> {
-    const data = await this.abciQuery(`/contract_code/${contract}`);
+  async getContractIr(contract: string): Promise<string | null> {
+    const data = await this.abciQuery(`/contract_ir/${contract}`);
     const value = asRecord(asRecord(data.result).response).value;
     if (value == null || value === EMPTY_ABCI_VALUE) {
       return null;
@@ -855,6 +858,67 @@ export class XianClient {
       waitForTx: request.waitForTx,
       timeoutMs: request.timeoutMs,
       pollIntervalMs: request.pollIntervalMs
+    });
+  }
+
+  async submitContract(
+    request: SubmitContractOptions
+  ): Promise<TransactionSubmission> {
+    if (typeof request.signer.getAddress !== "function") {
+      throw new TransactionError("signer.getAddress() is required for contract submission");
+    }
+    if (!isPlainObject(request.deploymentArtifacts)) {
+      throw new TransactionError("deploymentArtifacts must be an object");
+    }
+    if ("runtime_code" in request.deploymentArtifacts) {
+      throw new TransactionError("deploymentArtifacts must not include runtime_code");
+    }
+    const hashes = request.deploymentArtifacts.hashes;
+    if (isPlainObject(hashes) && "runtime_code_sha256" in hashes) {
+      throw new TransactionError(
+        "deploymentArtifacts hashes must not include runtime_code_sha256"
+      );
+    }
+
+    const kwargs: Record<string, unknown> = {
+      name: request.name,
+      deployment_artifacts: request.deploymentArtifacts
+    };
+    if (request.args && Object.keys(request.args).length > 0) {
+      kwargs.constructor_args = request.args;
+    }
+
+    const sender = await request.signer.getAddress();
+    return this.sendTx({
+      sender,
+      contract: "submission",
+      function: "submit_contract",
+      kwargs,
+      signer: request.signer,
+      mode: request.mode,
+      waitForTx: request.waitForTx,
+      timeoutMs: request.timeoutMs,
+      pollIntervalMs: request.pollIntervalMs,
+      chi: request.chi,
+      nonce: request.nonce,
+      chainId: request.chainId
+    });
+  }
+
+  async deployContract(
+    request: DeployContractOptions
+  ): Promise<TransactionSubmission> {
+    const { source, compiler, lint, vmProfile, ...submitRequest } = request;
+    const deploymentArtifacts = await compileContractArtifacts({
+      moduleName: request.name,
+      source,
+      compiler,
+      lint,
+      vmProfile
+    });
+    return this.submitContract({
+      ...submitRequest,
+      deploymentArtifacts
     });
   }
 
