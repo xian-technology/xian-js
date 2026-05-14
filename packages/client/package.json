@@ -1,6 +1,6 @@
 {
   "name": "@xian-tech/client",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Typed Xian client, tx helpers, and Ed25519 signer",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -29,12 +29,12 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@xian-tech/types": "0.1.7",
+    "@xian-tech/types": "0.1.8",
     "@noble/hashes": "^2.2.0",
     "tweetnacl": "^1.0.3"
   },
   "peerDependencies": {
-    "@xian-tech/compiler": "^0.1.0"
+    "@xian-tech/compiler": "^0.1.1"
   },
   "peerDependenciesMeta": {
     "@xian-tech/compiler": {
