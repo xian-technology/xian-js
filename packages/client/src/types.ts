@@ -93,6 +93,16 @@ export interface SimulateRequest {
   kwargs: Record<string, unknown>;
 }
 
+export interface XianAbciQueryOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+export interface XianContractVars {
+  variables: string[];
+  hashes: string[];
+}
+
 export interface XianTokenMetadata {
   contract: string;
   name: string | null;
@@ -156,6 +166,69 @@ export interface XianTokenBalancesResult {
   address: string;
   items: XianTokenBalance[];
   total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface XianPageOptions {
+  limit?: number;
+  offset?: number;
+}
+
+export interface XianEventListOptions extends XianPageOptions {
+  afterId?: number;
+}
+
+export interface XianIndexedBlock {
+  height: XianNumber | null;
+  blockHash: string | null;
+  appHash: string | null;
+  blockTime: string | XianNumber | null;
+  blockTimeIso: string | null;
+  proposer: string | null;
+  txCount: number | null;
+  raw: Record<string, unknown>;
+}
+
+export interface XianIndexedTransaction {
+  hash: string | null;
+  blockHeight: XianNumber | null;
+  blockHash: string | null;
+  blockTime: string | XianNumber | null;
+  txIndex: number | null;
+  sender: string | null;
+  nonce: XianNumber | null;
+  contract: string | null;
+  functionName: string | null;
+  success: boolean | null;
+  statusCode: number | null;
+  chiUsed: XianNumber | null;
+  result: unknown;
+  payload: Record<string, unknown> | null;
+  envelope: unknown;
+  createdAt: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface XianIndexedEvent {
+  id: number | null;
+  blockHeight: XianNumber | null;
+  txHash: string | null;
+  txIndex: number | null;
+  eventIndex: number | null;
+  contract: string | null;
+  event: string | null;
+  signer: string | null;
+  caller: string | null;
+  dataIndexed: Record<string, unknown> | null;
+  data: Record<string, unknown> | null;
+  createdAt: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface XianRecentEventsResult {
+  available: boolean;
+  items: XianIndexedEvent[];
   limit: number;
   offset: number;
 }

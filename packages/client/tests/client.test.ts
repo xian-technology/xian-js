@@ -632,6 +632,184 @@ describe("@xian-tech/client", () => {
     });
   });
 
+  it("exposes raw ABCI values and contract variable metadata", async () => {
+    const fetchFn = vi.fn(async (input: string | URL) => {
+      const url = new URL(String(input));
+      const path = decodeURIComponent(url.searchParams.get("path") ?? "");
+      if (url.pathname.endsWith("/abci_query") && path.includes("/get/currency.balances:alice")) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8("\"12.5\"")
+            }
+          }
+        });
+      }
+      if (url.pathname.endsWith("/abci_query") && path.includes("/contract_vars/currency")) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8(
+                JSON.stringify({
+                  variables: ["balances"],
+                  hashes: ["metadata"]
+                })
+              )
+            }
+          }
+        });
+      }
+      throw new Error(`unexpected URL: ${String(input)}`);
+    }) as typeof fetch;
+
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn
+    });
+
+    await expect(client.abciValue("/get/currency.balances:alice")).resolves.toBe("12.5");
+    await expect(client.getStateKey("currency.balances:alice")).resolves.toBe("12.5");
+    await expect(client.getContractVars("currency")).resolves.toEqual({
+      variables: ["balances"],
+      hashes: ["metadata"]
+    });
+  });
+
+  it("reads indexed transactions and events through BDS query helpers", async () => {
+    const fetchFn = vi.fn(async (input: string | URL) => {
+      const url = new URL(String(input));
+      const path = decodeURIComponent(url.searchParams.get("path") ?? "");
+      if (
+        url.pathname.endsWith("/abci_query") &&
+        path.includes("/txs_by_contract/governance/limit=10/offset=0")
+      ) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8(
+                JSON.stringify([
+                  {
+                    hash: "TX-1",
+                    block_height: 12,
+                    tx_index: 0,
+                    sender: "alice",
+                    nonce: 7,
+                    contract: "governance",
+                    function: "vote",
+                    success: true,
+                    status_code: 0,
+                    chi_used: "123",
+                    payload: { function: "vote" },
+                    created_at: "2026-04-10T12:00:00Z"
+                  }
+                ])
+              )
+            }
+          }
+        });
+      }
+      if (
+        url.pathname.endsWith("/abci_query") &&
+        path.includes("/events/governance/ProposalVoted/after_id=4/limit=5")
+      ) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8(
+                JSON.stringify([
+                  {
+                    id: 5,
+                    block_height: 12,
+                    tx_hash: "TX-1",
+                    tx_index: 0,
+                    event_index: 1,
+                    contract: "governance",
+                    event: "ProposalVoted",
+                    signer: "alice",
+                    caller: "alice",
+                    data_indexed: { proposal_id: 1, voter: "alice" },
+                    data: { vote: "yes" },
+                    created_at: "2026-04-10T12:00:00Z"
+                  }
+                ])
+              )
+            }
+          }
+        });
+      }
+      if (
+        url.pathname.endsWith("/abci_query") &&
+        path.includes("/recent_events/limit=3/offset=0")
+      ) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8(
+                JSON.stringify({
+                  available: true,
+                  items: [
+                    {
+                      id: 5,
+                      block_height: 12,
+                      tx_hash: "TX-1",
+                      event: "ProposalVoted",
+                      contract: "governance"
+                    }
+                  ],
+                  limit: 3,
+                  offset: 0
+                })
+              )
+            }
+          }
+        });
+      }
+      throw new Error(`unexpected URL: ${String(input)}`);
+    }) as typeof fetch;
+
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      fetchFn
+    });
+
+    await expect(
+      client.listTxsByContract("governance", { limit: 10 })
+    ).resolves.toMatchObject([
+      {
+        hash: "TX-1",
+        blockHeight: 12,
+        sender: "alice",
+        contract: "governance",
+        functionName: "vote",
+        success: true,
+        chiUsed: 123,
+        payload: { function: "vote" }
+      }
+    ]);
+    await expect(
+      client.listEvents("governance", "ProposalVoted", { afterId: 4, limit: 5 })
+    ).resolves.toMatchObject([
+      {
+        id: 5,
+        txHash: "TX-1",
+        event: "ProposalVoted",
+        dataIndexed: { proposal_id: 1, voter: "alice" },
+        data: { vote: "yes" }
+      }
+    ]);
+    await expect(client.getRecentEvents({ limit: 3 })).resolves.toMatchObject({
+      available: true,
+      items: [{ id: 5, contract: "governance", event: "ProposalVoted" }],
+      limit: 3,
+      offset: 0
+    });
+  });
+
   it("reads shielded wallet history through the indexed wallet feed", async () => {
     const fetchFn = vi.fn(async (input: string | URL) => {
       const url = new URL(String(input));

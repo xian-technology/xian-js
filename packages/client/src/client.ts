@@ -25,6 +25,14 @@ import type {
   GetShieldedWalletHistoryOptions,
   GetTokenBalancesOptions,
   SimulateRequest,
+  XianAbciQueryOptions,
+  XianContractVars,
+  XianEventListOptions,
+  XianIndexedBlock,
+  XianIndexedEvent,
+  XianIndexedTransaction,
+  XianPageOptions,
+  XianRecentEventsResult,
   TokenApproveOptions,
   TokenTransferOptions,
   TransactionReceipt,
@@ -137,6 +145,87 @@ function normalizeMaybeString(value: unknown): string | null {
     return null;
   }
   return typeof value === "string" ? value : String(value);
+}
+
+function normalizeMaybeBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
+function normalizeMaybeRecord(value: unknown): Record<string, unknown> | null {
+  return value != null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function pageLimit(options: XianPageOptions | undefined, fallback = 100): number {
+  return clampPageSize(options?.limit, fallback);
+}
+
+function pageOffset(options: XianPageOptions | undefined): number {
+  return clampOffset(options?.offset);
+}
+
+function normalizeIndexedBlock(item: Record<string, unknown>): XianIndexedBlock {
+  return {
+    height: normalizeMaybeXianNumber(item.height),
+    blockHash: normalizeMaybeString(item.block_hash ?? item.hash),
+    appHash: normalizeMaybeString(item.app_hash),
+    blockTime: normalizeMaybeString(item.block_time) ?? normalizeMaybeXianNumber(item.block_time),
+    blockTimeIso: normalizeMaybeString(item.block_time_iso),
+    proposer: normalizeMaybeString(item.proposer),
+    txCount: normalizeMaybeInteger(item.tx_count),
+    raw: item
+  };
+}
+
+function normalizeIndexedTransaction(
+  item: Record<string, unknown>
+): XianIndexedTransaction {
+  return {
+    hash: normalizeMaybeString(item.hash ?? item.tx_hash),
+    blockHeight: normalizeMaybeXianNumber(item.block_height),
+    blockHash: normalizeMaybeString(item.block_hash),
+    blockTime: normalizeMaybeString(item.block_time) ?? normalizeMaybeXianNumber(item.block_time),
+    txIndex: normalizeMaybeInteger(item.tx_index),
+    sender: normalizeMaybeString(item.sender),
+    nonce: normalizeMaybeXianNumber(item.nonce),
+    contract: normalizeMaybeString(item.contract),
+    functionName: normalizeMaybeString(item.function),
+    success: normalizeMaybeBoolean(item.success),
+    statusCode: normalizeMaybeInteger(item.status_code),
+    chiUsed: normalizeMaybeXianNumber(item.chi_used),
+    result: item.result,
+    payload: normalizeMaybeRecord(item.payload),
+    envelope: item.envelope,
+    createdAt: normalizeMaybeString(item.created_at),
+    raw: item
+  };
+}
+
+function normalizeIndexedEvent(item: Record<string, unknown>): XianIndexedEvent {
+  return {
+    id: normalizeMaybeInteger(item.id),
+    blockHeight: normalizeMaybeXianNumber(item.block_height),
+    txHash: normalizeMaybeString(item.tx_hash),
+    txIndex: normalizeMaybeInteger(item.tx_index),
+    eventIndex: normalizeMaybeInteger(item.event_index),
+    contract: normalizeMaybeString(item.contract),
+    event: normalizeMaybeString(item.event),
+    signer: normalizeMaybeString(item.signer),
+    caller: normalizeMaybeString(item.caller),
+    dataIndexed: normalizeMaybeRecord(item.data_indexed),
+    data: normalizeMaybeRecord(item.data),
+    createdAt: normalizeMaybeString(item.created_at),
+    raw: item
+  };
+}
+
+function normalizeIndexedEvents(value: unknown): XianIndexedEvent[] {
+  return Array.isArray(value)
+    ? value
+        .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
+        .map((item) => normalizeIndexedEvent(item))
+    : [];
 }
 
 /**
@@ -342,11 +431,14 @@ export class XianClient {
     }
   }
 
-  private async abciQuery(path: string): Promise<Record<string, unknown>> {
+  async abciQuery(
+    path: string,
+    options?: XianAbciQueryOptions
+  ): Promise<Record<string, unknown>> {
     const url = new URL(`${this.rpcUrl}/abci_query`);
     url.searchParams.set("path", `"${path}"`);
 
-    const data = await this.requestJson("POST", url.toString());
+    const data = await this.requestJson("POST", url.toString(), options);
     if ("error" in data) {
       throw new RpcError(readErrorMessage(asRecord(data.error)), data.error);
     }
@@ -361,6 +453,15 @@ export class XianClient {
     }
 
     return data;
+  }
+
+  async abciValue<T = unknown>(
+    path: string,
+    options?: XianAbciQueryOptions
+  ): Promise<T | null> {
+    const data = await this.abciQuery(path, options);
+    const value = asRecord(asRecord(data.result).response).value;
+    return this.decodeAbciValue(value) as T | null;
   }
 
   private decodeAbciValue(value: unknown): unknown {
@@ -455,8 +556,11 @@ export class XianClient {
 
   async getState(contract: string, variable: string, keys: string[] = []): Promise<unknown> {
     const suffix = keys.length > 0 ? `:${keys.join(":")}` : "";
-    const data = await this.abciQuery(`/get/${contract}.${variable}${suffix}`);
-    return this.decodeAbciValue(asRecord(asRecord(data.result).response).value);
+    return this.getStateKey(`${contract}.${variable}${suffix}`);
+  }
+
+  async getStateKey(key: string): Promise<unknown> {
+    return this.abciValue(`/get/${key}`);
   }
 
   async getBalance(address: string, options?: { contract?: string }): Promise<unknown> {
@@ -656,6 +760,161 @@ export class XianClient {
               .map((a) => ({ name: a.name, type: a.type }))
           : []
       }));
+  }
+
+  async getContractVars(contract: string): Promise<XianContractVars> {
+    const value = await this.abciValue<unknown>(`/contract_vars/${contract}`);
+    if (Array.isArray(value)) {
+      return {
+        variables: value.filter((item): item is string => typeof item === "string"),
+        hashes: []
+      };
+    }
+    if (value != null && typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      return {
+        variables: Array.isArray(record.variables)
+          ? record.variables.filter((item): item is string => typeof item === "string")
+          : [],
+        hashes: Array.isArray(record.hashes)
+          ? record.hashes.filter((item): item is string => typeof item === "string")
+          : []
+      };
+    }
+    return { variables: [], hashes: [] };
+  }
+
+  async getPerfStatus(): Promise<Record<string, unknown> | null> {
+    return this.abciValue<Record<string, unknown>>("/perf_status");
+  }
+
+  async getBdsStatus(): Promise<Record<string, unknown> | null> {
+    return this.abciValue<Record<string, unknown>>("/bds_status");
+  }
+
+  async listIndexedBlocks(options?: XianPageOptions): Promise<XianIndexedBlock[]> {
+    const limit = pageLimit(options);
+    const offset = pageOffset(options);
+    const value = await this.abciValue<unknown>(`/blocks/limit=${limit}/offset=${offset}`);
+    return Array.isArray(value)
+      ? value
+          .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
+          .map((item) => normalizeIndexedBlock(item))
+      : [];
+  }
+
+  async getIndexedBlock(height: number | string): Promise<XianIndexedBlock | null> {
+    const value = await this.abciValue<unknown>(`/block/${height}`);
+    return value != null && typeof value === "object"
+      ? normalizeIndexedBlock(value as Record<string, unknown>)
+      : null;
+  }
+
+  async getIndexedTx(txHash: string): Promise<XianIndexedTransaction | null> {
+    const value = await this.abciValue<unknown>(`/tx/${txHash}`);
+    return value != null && typeof value === "object"
+      ? normalizeIndexedTransaction(value as Record<string, unknown>)
+      : null;
+  }
+
+  async listTxsForBlock(
+    blockRef: number | string
+  ): Promise<XianIndexedTransaction[]> {
+    const value = await this.abciValue<unknown>(`/txs_for_block/${blockRef}`);
+    return Array.isArray(value)
+      ? value
+          .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
+          .map((item) => normalizeIndexedTransaction(item))
+      : [];
+  }
+
+  async listTxsBySender(
+    sender: string,
+    options?: XianPageOptions
+  ): Promise<XianIndexedTransaction[]> {
+    const limit = pageLimit(options);
+    const offset = pageOffset(options);
+    const value = await this.abciValue<unknown>(
+      `/txs_by_sender/${sender}/limit=${limit}/offset=${offset}`
+    );
+    return Array.isArray(value)
+      ? value
+          .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
+          .map((item) => normalizeIndexedTransaction(item))
+      : [];
+  }
+
+  async listTxsByContract(
+    contract: string,
+    options?: XianPageOptions
+  ): Promise<XianIndexedTransaction[]> {
+    const limit = pageLimit(options);
+    const offset = pageOffset(options);
+    const value = await this.abciValue<unknown>(
+      `/txs_by_contract/${contract}/limit=${limit}/offset=${offset}`
+    );
+    return Array.isArray(value)
+      ? value
+          .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
+          .map((item) => normalizeIndexedTransaction(item))
+      : [];
+  }
+
+  async getEventsForTx(txHash: string): Promise<XianIndexedEvent[]> {
+    return normalizeIndexedEvents(await this.abciValue<unknown>(`/events_for_tx/${txHash}`));
+  }
+
+  async listEvents(
+    contract: string,
+    event: string,
+    options?: XianEventListOptions
+  ): Promise<XianIndexedEvent[]> {
+    const limit = pageLimit(options);
+    const offset = pageOffset(options);
+    const afterId = normalizeMaybeInteger(options?.afterId);
+    const cursor = afterId == null ? `offset=${offset}` : `after_id=${afterId}`;
+    return normalizeIndexedEvents(
+      await this.abciValue<unknown>(
+        `/events/${contract}/${event}/${cursor}/limit=${limit}`
+      )
+    );
+  }
+
+  async getRecentEvents(options?: XianPageOptions): Promise<XianRecentEventsResult> {
+    const limit = pageLimit(options);
+    const offset = pageOffset(options);
+    const value = await this.abciValue<unknown>(`/recent_events/limit=${limit}/offset=${offset}`);
+    if (Array.isArray(value)) {
+      return {
+        available: true,
+        items: normalizeIndexedEvents(value),
+        limit,
+        offset
+      };
+    }
+    const payload = value != null && typeof value === "object"
+      ? value as Record<string, unknown>
+      : {};
+    return {
+      available: payload.available !== false,
+      items: normalizeIndexedEvents(payload.items),
+      limit: Number(payload.limit ?? limit),
+      offset: Number(payload.offset ?? offset)
+    };
+  }
+
+  async getStateHistory(
+    key: string,
+    options?: XianPageOptions
+  ): Promise<Record<string, unknown>[]> {
+    const limit = pageLimit(options);
+    const offset = pageOffset(options);
+    const value = await this.abciValue<unknown>(
+      `/state_history/${key}/limit=${limit}/offset=${offset}`
+    );
+    return Array.isArray(value)
+      ? value.filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
+      : [];
   }
 
   async simulate(request: SimulateRequest): Promise<Record<string, unknown>> {
