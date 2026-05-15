@@ -1,4 +1,4 @@
-import { ProviderUnauthorizedError } from "./errors";
+import { ProviderUnauthorizedError } from "./errors.js";
 import type {
   BroadcastMode,
   TransactionSubmission,
@@ -10,7 +10,7 @@ import type {
   XianSigner,
   XianWatchAssetRequest,
   XianUnsignedTransaction
-} from "./provider";
+} from "./provider.js";
 
 export const XIAN_INITIALIZED_EVENT = "xian#initialized";
 

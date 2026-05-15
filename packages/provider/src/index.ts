@@ -17,7 +17,7 @@ export {
   type XianWatchedAsset,
   type XianWatchAssetRequest,
   type XianUnsignedTransaction
-} from "./provider";
+} from "./provider.js";
 export {
   InjectedXianWallet,
   ProviderBackedXianSigner,
@@ -33,19 +33,19 @@ export {
   type XianInjectionTarget,
   type XianProviderNamespace,
   type XianWalletMetadata
-} from "./discovery";
+} from "./discovery.js";
 export {
   ProviderChainMismatchError,
   ProviderDisconnectedError,
   ProviderUnauthorizedError,
   ProviderUnsupportedMethodError,
   XianProviderError
-} from "./errors";
+} from "./errors.js";
 export {
   WalletConnectXianProvider,
   type WalletConnectRequestClient,
   type WalletConnectXianProviderOptions
-} from "./walletconnect";
+} from "./walletconnect.js";
 export {
   XIAN_WALLETCONNECT_EVENTS,
   XIAN_WALLETCONNECT_METHODS,
@@ -65,4 +65,4 @@ export {
   type XianDappRequestContext,
   type XianWalletConnectEvent,
   type XianWalletConnectMethod
-} from "./permissions";
+} from "./permissions.js";

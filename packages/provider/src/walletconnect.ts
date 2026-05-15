@@ -2,19 +2,19 @@ import {
   ProviderChainMismatchError,
   ProviderDisconnectedError,
   ProviderUnauthorizedError
-} from "./errors";
+} from "./errors.js";
 import type {
   XianProvider,
   XianProviderRequest,
   XianWalletCapabilities,
   XianWalletDescriptor,
   XianWalletInfo
-} from "./provider";
+} from "./provider.js";
 import {
   XIAN_WALLETCONNECT_METHODS,
   xianAccountFromCaip10,
   xianChainIdToCaip2
-} from "./permissions";
+} from "./permissions.js";
 
 type Listener = (...args: unknown[]) => void;
 

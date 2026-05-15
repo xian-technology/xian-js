@@ -3,7 +3,7 @@ import {
   ProviderDisconnectedError,
   ProviderUnauthorizedError,
   ProviderUnsupportedMethodError
-} from "./errors";
+} from "./errors.js";
 import type {
   BroadcastMode,
   XianNumber,

@@ -1,4 +1,4 @@
-import type { XianNumber, XianProviderRequest } from "./provider";
+import type { XianNumber, XianProviderRequest } from "./provider.js";
 
 export const XIAN_WALLETCONNECT_NAMESPACE = "xian";
 
