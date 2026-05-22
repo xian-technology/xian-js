@@ -1,9 +1,11 @@
 import {
   base64ToUtf8,
+  bytesToUtf8,
   bytesToHex,
   canonicalizeRuntime,
   decodeRuntime,
   encodeRuntime,
+  hexToBytes,
   normalizeMaybeInteger,
   normalizeMaybeXianNumber,
   parseXianNumber,
@@ -510,7 +512,7 @@ export class XianClient {
     if (decoded != null) {
       return decoded;
     }
-    return decodeRuntime(hexToUtf8(hexPayload));
+    return decodeRuntime(bytesToUtf8(hexToBytes(hexPayload)));
   }
 
   async getGenesis(): Promise<Record<string, unknown>> {
@@ -1188,14 +1190,6 @@ export class XianClient {
   token(name: string = "currency"): TokenClient {
     return new TokenClient(this, name);
   }
-}
-
-function hexToUtf8(value: string): string {
-  const out = new Uint8Array(value.length / 2);
-  for (let index = 0; index < value.length; index += 2) {
-    out[index / 2] = Number.parseInt(value.slice(index, index + 2), 16);
-  }
-  return new TextDecoder().decode(out);
 }
 
 export class ContractClient {

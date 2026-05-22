@@ -5,8 +5,11 @@ import {
   canonicalizeRuntime,
   decodeRuntime,
   encodeRuntime,
+  isValidEd25519Key,
+  isValidEd25519Signature,
   verifyMessage
 } from "../src/index";
+import { hexToBytes } from "../src/encoding";
 
 describe("@xian-tech/client encoding", () => {
   it("canonicalizes payloads with sorted keys", () => {
@@ -51,6 +54,15 @@ describe("@xian-tech/client encoding", () => {
     const signature = signer.signMessage(message);
     expect(signature).toHaveLength(128);
     expect(verifyMessage(signer.address, message, signature)).toBe(true);
+  });
+
+  it("rejects non-hex key and signature material", () => {
+    expect(() => hexToBytes("0xzz")).toThrow("non-hex characters");
+    expect(isValidEd25519Key("z".repeat(64))).toBe(false);
+    expect(isValidEd25519Signature("z".repeat(128))).toBe(false);
+    expect(() => new Ed25519Signer("z".repeat(64))).toThrow(
+      "private key must be a 32-byte hex string"
+    );
   });
 
   it("canonicalizes unicode without ASCII escaping", () => {

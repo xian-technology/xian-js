@@ -19,6 +19,9 @@ export function hexToBytes(value: string): Uint8Array {
   if (normalized.length % 2 !== 0) {
     throw new TypeError("hex string must contain an even number of characters");
   }
+  if (!/^[0-9a-fA-F]*$/.test(normalized)) {
+    throw new TypeError("hex string contains non-hex characters");
+  }
   const out = new Uint8Array(normalized.length / 2);
   for (let index = 0; index < normalized.length; index += 2) {
     out[index / 2] = Number.parseInt(normalized.slice(index, index + 2), 16);
