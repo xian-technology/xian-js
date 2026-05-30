@@ -133,7 +133,13 @@ jobs:
               echo "${name}@${version} is already published; skipping"
               continue
             fi
-            npm publish "./$package" --provenance --access public
+            if ! npm publish "./$package" --provenance --access public; then
+              if [ "${name}" = "@xian-tech/web-kit" ]; then
+                echo "::warning::${name}@${version} could not be published to npm; keeping it in the GitHub release artifacts"
+                continue
+              fi
+              exit 1
+            fi
           done
 
   github-release:
