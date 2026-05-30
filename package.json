@@ -15,7 +15,7 @@
   "scripts": {
     "build:compiler": "PATH=/opt/homebrew/opt/rustup/bin:$PATH npm --prefix ../xian-contracting/packages/xian-compiler-core/npm run build",
     "build": "npm run build --workspace @xian-tech/types && npm run build --workspaces --if-present",
-    "typecheck": "npm run build --workspace @xian-tech/types && npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run build --workspace @xian-tech/types && npm run build --workspace @xian-tech/provider && npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:compiler": "npm run build:compiler && XIAN_WASM_COMPILER_TEST=1 vitest run packages/client/tests/compiler-wasm.test.ts",
     "validate": "npm run typecheck && npm run build && npm run test"

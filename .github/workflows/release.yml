@@ -67,7 +67,8 @@ jobs:
           const packageFiles = [
             "packages/types/package.json",
             "packages/client/package.json",
-            "packages/provider/package.json"
+            "packages/provider/package.json",
+            "packages/web-kit/package.json"
           ];
 
           for (const file of packageFiles) {
@@ -84,6 +85,7 @@ jobs:
           npm pack --workspace @xian-tech/types --pack-destination release-dist
           npm pack --workspace @xian-tech/client --pack-destination release-dist
           npm pack --workspace @xian-tech/provider --pack-destination release-dist
+          npm pack --workspace @xian-tech/web-kit --pack-destination release-dist
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v6
@@ -118,7 +120,8 @@ jobs:
           for package in \
             release-dist/xian-tech-types-*.tgz \
             release-dist/xian-tech-client-*.tgz \
-            release-dist/xian-tech-provider-*.tgz
+            release-dist/xian-tech-provider-*.tgz \
+            release-dist/xian-tech-web-kit-*.tgz
           do
             metadata="$(
               tar -xOf "$package" package/package.json \
