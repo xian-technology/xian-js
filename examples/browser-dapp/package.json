@@ -1,6 +1,6 @@
 {
   "name": "example-browser-dapp",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,8 +8,8 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@xian-tech/client": "0.1.9",
-    "@xian-tech/provider": "0.1.9"
+    "@xian-tech/client": "0.1.10",
+    "@xian-tech/provider": "0.1.10"
   },
   "devDependencies": {
     "vite": "^8.0.10",
