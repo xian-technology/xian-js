@@ -1,0 +1,39 @@
+{
+  "name": "@xian-tech/web-kit",
+  "version": "0.1.9",
+  "description": "Shared Xian web application wallet, RPC, toast, and formatting helpers",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xian-technology/xian-js.git",
+    "directory": "packages/web-kit"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@xian-tech/provider": "0.1.9"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "react": "^19.2.5"
+  }
+}

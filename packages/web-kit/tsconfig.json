@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "jsx": "react-jsx",
+    "paths": {
+      "@xian-tech/client": ["packages/client/dist/index.d.ts"],
+      "@xian-tech/provider": ["packages/provider/dist/index.d.ts"],
+      "@xian-tech/types": ["packages/types/dist/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}
