@@ -15,6 +15,7 @@ interface CompileContractArtifactsOptions {
 interface XianCompilerModule extends XianContractCompiler {}
 
 const DEFAULT_VM_PROFILE = "xian_vm_v1";
+const DEFAULT_COMPILER_MODULE = "@xian-tech/compiler";
 
 function compilerOptionsJson(vmProfile: string, lint: boolean): string {
   return JSON.stringify({ lint, vm_profile: vmProfile });
@@ -22,7 +23,9 @@ function compilerOptionsJson(vmProfile: string, lint: boolean): string {
 
 async function loadDefaultCompiler(): Promise<XianCompilerModule> {
   try {
-    return (await import("@xian-tech/compiler")) as XianCompilerModule;
+    return (await import(
+      /* @vite-ignore */ DEFAULT_COMPILER_MODULE
+    )) as XianCompilerModule;
   } catch (error) {
     throw new TransactionError(
       "deployContract requires @xian-tech/compiler or an injected compiler",
