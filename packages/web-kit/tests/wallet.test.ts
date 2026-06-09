@@ -8,21 +8,32 @@ import {
   sendCallFailureMessage,
   type SendCallResult
 } from "../src/index";
-import type { XianInjectionTarget, XianProvider } from "@xian-tech/provider";
+import {
+  registerInjectedXianProvider,
+  type XianInjectionTarget,
+  type XianProvider
+} from "@xian-tech/provider";
 
 class FakeTarget extends EventTarget implements XianInjectionTarget {
   xian?: XianInjectionTarget["xian"];
   xianProviders?: XianInjectionTarget["xianProviders"];
 }
 
-function createLegacyTarget(provider: XianProvider): FakeTarget {
+function createRegisteredTarget(provider: XianProvider): FakeTarget {
   const target = new FakeTarget();
-  target.xian = { provider, providers: [] };
+  registerInjectedXianProvider({
+    target,
+    provider,
+    metadata: {
+      id: "test-xian-wallet",
+      name: "Test Xian Wallet"
+    }
+  });
   return target;
 }
 
 describe("@xian-tech/web-kit wallet helpers", () => {
-  it("wraps a legacy window.xian.provider injection", async () => {
+  it("wraps a registered provider injection", async () => {
     const request = vi.fn(async ({ method }: { method: string }) => {
       if (method === "xian_requestAccounts") {
         return ["a".repeat(64)];
@@ -34,12 +45,24 @@ describe("@xian-tech/web-kit wallet helpers", () => {
       on: vi.fn(),
       removeListener: vi.fn()
     };
-    const target = createLegacyTarget(provider);
+    const target = createRegisteredTarget(provider);
 
     expect(getInjectedWallet({ target })?.metadata?.id).toBe(
-      "injected-xian-wallet"
+      "test-xian-wallet"
     );
     await expect(connectWallet({ target })).resolves.toEqual(["a".repeat(64)]);
+  });
+
+  it("ignores an unregistered xian.provider fallback", () => {
+    const provider: XianProvider = {
+      request: vi.fn(),
+      on: vi.fn(),
+      removeListener: vi.fn()
+    };
+    const target = new FakeTarget();
+    target.xian = { provider, providers: [] };
+
+    expect(getInjectedWallet({ target })).toBeUndefined();
   });
 
   it("sends provider-backed calls with default wait settings", async () => {
@@ -59,7 +82,7 @@ describe("@xian-tech/web-kit wallet helpers", () => {
       on: vi.fn(),
       removeListener: vi.fn()
     };
-    const target = createLegacyTarget(provider);
+    const target = createRegisteredTarget(provider);
 
     await expect(
       sendCall(

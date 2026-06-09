@@ -9,7 +9,6 @@ import {
   type TransactionSubmission,
   type WaitForInjectedXianProviderOptions,
   type XianInjectionTarget,
-  type XianProvider,
   type XianTransactionIntent,
   type XianWalletInfo
 } from "@xian-tech/provider";
@@ -36,17 +35,6 @@ export interface SendCallOptions {
   target?: XianInjectionTarget;
 }
 
-type LegacyProviderTarget = XianInjectionTarget & {
-  xian?: {
-    provider?: XianProvider;
-  };
-};
-
-const FALLBACK_WALLET_METADATA = {
-  id: "injected-xian-wallet",
-  name: "Xian Wallet"
-};
-
 function resolveTarget(target?: XianInjectionTarget): XianInjectionTarget | undefined {
   if (target) {
     return target;
@@ -63,11 +51,6 @@ function walletFromRecord(
   return record ? InjectedXianWallet.fromRecord(record) : undefined;
 }
 
-function getLegacyProvider(target?: XianInjectionTarget): XianProvider | undefined {
-  const resolvedTarget = resolveTarget(target) as LegacyProviderTarget | undefined;
-  return resolvedTarget?.xian?.provider;
-}
-
 export function getInjectedWallet(
   options?: FindInjectedXianProviderOptions
 ): InjectedXianWallet | undefined {
@@ -77,15 +60,7 @@ export function getInjectedWallet(
   }
 
   const record = getInjectedXianProvider({ ...options, target });
-  const wallet = walletFromRecord(record);
-  if (wallet) {
-    return wallet;
-  }
-
-  const legacyProvider = getLegacyProvider(target);
-  return legacyProvider
-    ? new InjectedXianWallet(legacyProvider, FALLBACK_WALLET_METADATA)
-    : undefined;
+  return walletFromRecord(record);
 }
 
 export async function waitForInjectedWallet(
