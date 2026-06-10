@@ -6,7 +6,7 @@ RPC client, the browser wallet provider contract, the injected-wallet
 discovery layer, and runnable integration examples.
 
 The repo is a TypeScript monorepo. Packages publish independently under the
-`@xian-tech/*` scope. Browser wallet *product* code now lives in the sibling
+`@xian-tech/*` scope. Browser wallet *product* code lives in the sibling
 [`xian-wallet-browser`](../xian-wallet-browser) repo; this repo provides the
 SDK and provider primitives that wallet implementations depend on.
 
@@ -290,6 +290,9 @@ same flows interactively.
   contract, an in-memory reference implementation, and the injected-wallet
   discovery helpers.
 - `packages/types/` — shared TypeScript types used across packages.
+- `packages/web-kit/` — `@xian-tech/web-kit`: shared browser-app helpers for
+  wallet connection, RPC client persistence, formatting, toasts, and React
+  integration.
 - `examples/` — runnable integration examples that exercise the public
   packages.
   - `browser-dapp/` — dapp-side playground for reads, provider calls,
