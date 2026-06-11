@@ -8,6 +8,10 @@ Current packages:
   websocket subscriptions
 - `@xian-tech/provider`: browser wallet provider contract, injected-wallet discovery
   helpers, and a simple reference implementation
+- `@xian-tech/types`: shared transaction, signer, number, and broadcast-mode
+  types consumed by the other packages
+- `@xian-tech/web-kit`: shared browser-app helpers for wallet connection, RPC
+  client persistence, formatting, toasts, and React integration
 - `examples/browser-dapp`: a runnable browser-side integration example that
   exercises the public package surface
 
@@ -17,8 +21,10 @@ Companion repo:
 
 Dependency direction:
 
+- `@xian-tech/types` has no workspace dependencies
 - `@xian-tech/client` must not depend on `@xian-tech/provider`
 - `@xian-tech/provider` may depend on `@xian-tech/client` types and helpers
+- `@xian-tech/web-kit` builds on `@xian-tech/client` and `@xian-tech/provider`
 - browser wallet implementations should consume `@xian-tech/provider` rather than
   redefining the injected-provider contract locally
 
