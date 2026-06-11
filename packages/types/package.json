@@ -1,6 +1,6 @@
 {
   "name": "@xian-tech/types",
-  "version": "0.1.11",
+  "version": "0.1.12-beta.1",
   "description": "Shared TypeScript types used across the Xian JS workspace",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
