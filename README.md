@@ -297,7 +297,6 @@ same flows interactively.
   packages.
   - `browser-dapp/` — dapp-side playground for reads, provider calls,
     websocket subscriptions, and intent-based transaction flows.
-- `apps/` — internal apps used during development.
 - `docs/` — repo-local architecture, backlog, and release notes.
 
 ## Validation

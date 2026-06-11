@@ -8,4 +8,4 @@ Files:
 - `BACKLOG.md`: follow-up work for the SDK workspace
 - `RELEASING.md`: versioning policy and tag-based npm release flow
 
-Browser wallet product notes now live in `../xian-wallet-browser/docs/`.
+Browser wallet product notes live in `../xian-wallet-browser/docs/`.

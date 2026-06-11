@@ -8,4 +8,4 @@ Current examples:
 - `browser-dapp/`: a small browser UI for reads, signing, tx previews,
   provider calls, and websocket subscriptions
 
-Wallet applications now live in the sibling `../xian-wallet-browser` repo.
+Wallet applications live in the sibling `../xian-wallet-browser` repo.
