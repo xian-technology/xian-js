@@ -1,6 +1,6 @@
 {
   "name": "@xian-tech/provider",
-  "version": "0.1.12-beta.1",
+  "version": "0.1.12-beta.2",
   "description": "Xian browser wallet provider contract and reference provider",
   "repository": {
     "type": "git",
@@ -26,6 +26,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@xian-tech/types": "0.1.12-beta.1"
+    "@xian-tech/types": "0.1.12-beta.2"
   }
 }
