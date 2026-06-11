@@ -125,7 +125,7 @@ jobs:
           do
             metadata="$(
               tar -xOf "$package" package/package.json \
-                | node -e 'let input = ""; process.stdin.on("data", chunk => input += chunk); process.stdin.on("end", () => { const pkg = JSON.parse(input); console.log(`${pkg.name}\t${pkg.version}`); });'
+                | node -e 'let input = ""; process.stdin.on("data", chunk => input += chunk); process.stdin.on("end", () => { const pkg = JSON.parse(input); console.log(pkg.name + "\t" + pkg.version); });'
             )"
             name="${metadata%%$'\t'*}"
             version="${metadata#*$'\t'}"
@@ -133,7 +133,11 @@ jobs:
               echo "${name}@${version} is already published; skipping"
               continue
             fi
-            if ! npm publish "./$package" --provenance --access public; then
+            publish_tag="latest"
+            if [[ "${version}" == *"-"* ]]; then
+              publish_tag="beta"
+            fi
+            if ! npm publish "./$package" --provenance --access public --tag "${publish_tag}"; then
               if [ "${name}" = "@xian-tech/web-kit" ]; then
                 echo "::warning::${name}@${version} could not be published to npm; keeping it in the GitHub release artifacts"
                 continue
@@ -160,8 +164,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          release_flags=()
+          if [[ "${GITHUB_REF_NAME}" == *"-"* ]]; then
+            release_flags+=(--prerelease)
+          fi
           gh release create "${GITHUB_REF_NAME}" release-dist/* \
             --repo "${GITHUB_REPOSITORY}" \
             --verify-tag \
             --title "xian-js ${GITHUB_REF_NAME#v}" \
-            --generate-notes
+            --generate-notes \
+            "${release_flags[@]}"
