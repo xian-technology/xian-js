@@ -41,8 +41,9 @@ Release checklist:
 
 ## Tag Workflow
 
-1. Update `packages/client/package.json` and `packages/provider/package.json`
-   to the intended release version.
+1. Update every publishable package manifest to the intended release version:
+   `packages/client/package.json`, `packages/provider/package.json`,
+   `packages/types/package.json`, and `packages/web-kit/package.json`.
 2. Run `npm install` if package metadata changed.
 3. Run `npm run validate`.
 4. Commit the release version changes.
@@ -58,6 +59,11 @@ On `v*` tags, GitHub Actions will:
 4. build npm tarballs for the publishable packages
 5. publish them to npm with trusted publishing
 6. create a GitHub release from the same tag
+
+The npm publish step is all-or-fail for package versions that are not already on
+npm. A package that is already published is skipped, but any new package version
+that cannot be published fails the release workflow instead of creating a
+partial release.
 
 ## Notes
 

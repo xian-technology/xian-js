@@ -137,13 +137,7 @@ jobs:
             if [[ "${version}" == *"-"* ]]; then
               publish_tag="beta"
             fi
-            if ! npm publish "./$package" --provenance --access public --tag "${publish_tag}"; then
-              if [ "${name}" = "@xian-tech/web-kit" ]; then
-                echo "::warning::${name}@${version} could not be published to npm; keeping it in the GitHub release artifacts"
-                continue
-              fi
-              exit 1
-            fi
+            npm publish "./$package" --provenance --access public --tag "${publish_tag}"
           done
 
   github-release:
