@@ -287,4 +287,46 @@ describe("@xian-tech/provider", () => {
       })
     ).rejects.toBeInstanceOf(ProviderChainMismatchError);
   });
+
+  it("rejects raw transaction signing when the tx chain does not match the active wallet chain", async () => {
+    const tx: XianUnsignedTransaction = {
+      payload: {
+        chain_id: "xian-testnet",
+        contract: "currency",
+        function: "transfer",
+        kwargs: { to: "bob", amount: "5" },
+        nonce: 1,
+        sender: "a".repeat(64),
+        chi_supplied: 50_000
+      }
+    };
+    const client: XianProviderClient = {
+      getChainId: vi.fn(async () => "xian-local"),
+      buildTx: vi.fn(),
+      signTx: vi.fn(),
+      broadcastTx: vi.fn()
+    };
+    const provider = new InMemoryXianProvider({
+      signer,
+      client
+    });
+
+    await provider.request({ method: "xian_connect" });
+
+    await expect(
+      provider.request({
+        method: "xian_signTransaction",
+        params: [{ tx }]
+      })
+    ).rejects.toBeInstanceOf(ProviderChainMismatchError);
+    await expect(
+      provider.request({
+        method: "xian_sendTransaction",
+        params: [{ tx }]
+      })
+    ).rejects.toBeInstanceOf(ProviderChainMismatchError);
+
+    expect(client.signTx).not.toHaveBeenCalled();
+    expect(client.broadcastTx).not.toHaveBeenCalled();
+  });
 });

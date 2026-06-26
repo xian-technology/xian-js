@@ -326,6 +326,17 @@ export class InMemoryXianProvider implements XianProvider {
     });
   }
 
+  private async requireTransactionChain(tx: XianUnsignedTransaction): Promise<void> {
+    const activeChainId = await this.ensureChainId();
+    const txChainId = tx?.payload?.chain_id;
+    if (typeof txChainId !== "string" || txChainId.length === 0) {
+      throw new TypeError("transaction payload must include chain_id");
+    }
+    if (txChainId !== activeChainId) {
+      throw new ProviderChainMismatchError();
+    }
+  }
+
   private normalizeWatchAssetRequest(
     request: Record<string, unknown>
   ): XianWatchedAsset {
@@ -420,7 +431,9 @@ export class InMemoryXianProvider implements XianProvider {
           throw new TypeError("provider client is required for xian_signTransaction");
         }
         const { tx } = firstParamObject(args.params);
-        return this.options.client.signTx(tx as XianUnsignedTransaction, this.options.signer);
+        const unsignedTx = tx as XianUnsignedTransaction;
+        await this.requireTransactionChain(unsignedTx);
+        return this.options.client.signTx(unsignedTx, this.options.signer);
       }
 
       case "xian_prepareTransaction": {
@@ -435,8 +448,10 @@ export class InMemoryXianProvider implements XianProvider {
           throw new TypeError("provider client is required for xian_sendTransaction");
         }
         const { tx, mode, waitForTx, timeoutMs, pollIntervalMs } = firstParamObject(args.params);
+        const unsignedTx = tx as XianUnsignedTransaction;
+        await this.requireTransactionChain(unsignedTx);
         const signedTx = await this.options.client.signTx(
-          tx as XianUnsignedTransaction,
+          unsignedTx,
           this.options.signer
         );
         return this.options.client.broadcastTx(signedTx, {

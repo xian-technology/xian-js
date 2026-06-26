@@ -7,9 +7,10 @@ import {
   encodeRuntime,
   isValidEd25519Key,
   isValidEd25519Signature,
+  parseXianNumber,
   verifyMessage
 } from "../src/index";
-import { hexToBytes } from "../src/encoding";
+import { hexToBytes, normalizeMaybeInteger } from "../src/encoding";
 
 describe("@xian-tech/client encoding", () => {
   it("canonicalizes payloads with sorted keys", () => {
@@ -37,6 +38,26 @@ describe("@xian-tech/client encoding", () => {
 
     const decoded = decodeRuntime<{ balance: bigint }>(encoded);
     expect(decoded?.balance).toBe(2n ** 60n);
+  });
+
+  it("preserves unsafe integer literals while decoding runtime JSON", () => {
+    expect(decodeRuntime("-9007199254740992")).toBe(-9007199254740992n);
+    expect(
+      decodeRuntime(
+        '{"safe":42,"unsafe":-9007199254740992,"text":"-9007199254740992"}'
+      )
+    ).toEqual({
+      safe: 42,
+      unsafe: -9007199254740992n,
+      text: "-9007199254740992"
+    });
+  });
+
+  it("preserves unsafe negative Xian integers as bigint", () => {
+    const unsafeNegative = "-9007199254740992";
+
+    expect(parseXianNumber(unsafeNegative)).toBe(-9007199254740992n);
+    expect(normalizeMaybeInteger(unsafeNegative)).toBeNull();
   });
 
   it("signs canonical payload strings with Ed25519", () => {

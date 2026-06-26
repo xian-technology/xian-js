@@ -112,6 +112,100 @@ export function encodeRuntime(value: unknown): string {
   return JSON.stringify(encodeValue(value));
 }
 
+function isDigit(character: string): boolean {
+  return character >= "0" && character <= "9";
+}
+
+function preserveUnsafeIntegerTokens(text: string): string {
+  let output = "";
+  let index = 0;
+  let inString = false;
+  let escaping = false;
+
+  while (index < text.length) {
+    const character = text.charAt(index);
+
+    if (inString) {
+      output += character;
+      if (escaping) {
+        escaping = false;
+      } else if (character === "\\") {
+        escaping = true;
+      } else if (character === "\"") {
+        inString = false;
+      }
+      index += 1;
+      continue;
+    }
+
+    if (character === "\"") {
+      inString = true;
+      output += character;
+      index += 1;
+      continue;
+    }
+
+    const isNumberStart = character === "-" || isDigit(character);
+    if (!isNumberStart) {
+      output += character;
+      index += 1;
+      continue;
+    }
+
+    const start = index;
+    if (character === "-") {
+      index += 1;
+      if (index >= text.length || !isDigit(text.charAt(index))) {
+        output += character;
+        continue;
+      }
+    }
+
+    if (text.charAt(index) === "0") {
+      index += 1;
+    } else {
+      while (index < text.length && isDigit(text.charAt(index))) {
+        index += 1;
+      }
+    }
+
+    let isPlainInteger = true;
+    if (text.charAt(index) === ".") {
+      isPlainInteger = false;
+      index += 1;
+      while (index < text.length && isDigit(text.charAt(index))) {
+        index += 1;
+      }
+    }
+    if (text.charAt(index) === "e" || text.charAt(index) === "E") {
+      isPlainInteger = false;
+      index += 1;
+      if (text.charAt(index) === "+" || text.charAt(index) === "-") {
+        index += 1;
+      }
+      while (index < text.length && isDigit(text.charAt(index))) {
+        index += 1;
+      }
+    }
+
+    const token = text.slice(start, index);
+    if (isPlainInteger) {
+      try {
+        const parsed = BigInt(token);
+        if (parsed < -MAX_SAFE || parsed > MAX_SAFE) {
+          output += `{"__big_int__":"${token}"}`;
+          continue;
+        }
+      } catch {
+        // Leave invalid JSON number tokens untouched so JSON.parse reports them.
+      }
+    }
+    output += token;
+  }
+
+  return output;
+}
+
 function decodeValue(value: unknown): unknown {
   if (!isPlainObject(value)) {
     if (Array.isArray(value)) {
@@ -143,7 +237,7 @@ export function decodeRuntime<T = unknown>(value: string | Uint8Array | null | u
   }
   const text = value instanceof Uint8Array ? bytesToUtf8(value) : value;
   try {
-    return decodeValue(JSON.parse(text)) as T;
+    return decodeValue(JSON.parse(preserveUnsafeIntegerTokens(text))) as T;
   } catch {
     return null;
   }
@@ -155,7 +249,7 @@ export function canonicalizeRuntime(value: unknown): string {
 
 export function parseXianNumber(value: string): number | bigint {
   const normalized = BigInt(value);
-  return normalized <= MAX_SAFE ? Number(normalized) : normalized;
+  return normalized >= -MAX_SAFE && normalized <= MAX_SAFE ? Number(normalized) : normalized;
 }
 
 /**
@@ -183,10 +277,11 @@ export function normalizeMaybeXianNumber(value: unknown): number | bigint | null
  */
 export function normalizeMaybeInteger(value: unknown): number | null {
   if (typeof value === "number" && Number.isInteger(value)) {
-    return value;
+    return Number.isSafeInteger(value) ? value : null;
   }
   if (typeof value === "string" && /^-?\d+$/.test(value)) {
-    return Number(value);
+    const parsed = BigInt(value);
+    return parsed >= -MAX_SAFE && parsed <= MAX_SAFE ? Number(parsed) : null;
   }
   return null;
 }

@@ -380,6 +380,7 @@ describe("@xian-tech/client", () => {
     const listener = vi.fn();
     const subscription = client.watch.state("currency.balances:*", listener);
 
+    expect(sockets[0]?.url).toBe("ws://127.0.0.1:8080/ws");
     sockets[0]?.open();
     expect(sentMessages).toEqual([
       '{"action":"subscribe","type":"state","key":"currency.balances:*"}'
@@ -401,6 +402,27 @@ describe("@xian-tech/client", () => {
 
     await subscription.unsubscribe();
     expect(sockets[0]?.closeCalls).toBe(1);
+  });
+
+  it("converts https dashboard URLs to secure websocket URLs", async () => {
+    const sockets: FakeSocket[] = [];
+    const webSocketFactory = vi.fn((url: string) => {
+      const socket = new FakeSocket(url, []);
+      sockets.push(socket);
+      return socket;
+    });
+
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      dashboardUrl: "https://dashboard.example/",
+      fetchFn: vi.fn() as unknown as typeof fetch,
+      webSocketFactory
+    });
+
+    const subscription = client.watch.blocks(() => {});
+
+    expect(sockets[0]?.url).toBe("wss://dashboard.example/ws");
+    await subscription.unsubscribe();
   });
 
   it("falls back to direct state reads when balance simulation fails", async () => {

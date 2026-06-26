@@ -156,7 +156,13 @@ export class WatchApi {
     if (!this.options.dashboardUrl) {
       throw new TransportError("dashboardUrl is required for websocket subscriptions");
     }
-    return `${this.options.dashboardUrl.replace(/\/+$/, "")}/ws`;
+    const url = new URL(`${this.options.dashboardUrl.replace(/\/+$/, "")}/ws`);
+    if (url.protocol === "http:") {
+      url.protocol = "ws:";
+    } else if (url.protocol === "https:") {
+      url.protocol = "wss:";
+    }
+    return url.toString();
   }
 
   blocks(
