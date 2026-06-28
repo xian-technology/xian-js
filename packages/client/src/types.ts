@@ -53,7 +53,7 @@ export interface ContractDeploymentArtifacts {
 
 export interface SubmitContractOptions {
   name: string;
-  deploymentArtifacts: ContractDeploymentArtifacts;
+  source: string;
   signer: XianSigner;
   args?: Record<string, unknown>;
   mode?: BroadcastMode;
@@ -78,13 +78,7 @@ export interface XianContractCompiler {
   ) => string | Promise<string>;
 }
 
-export interface DeployContractOptions
-  extends Omit<SubmitContractOptions, "deploymentArtifacts"> {
-  source: string;
-  compiler?: XianContractCompiler;
-  lint?: boolean;
-  vmProfile?: string;
-}
+export type DeployContractOptions = SubmitContractOptions;
 
 export interface SimulateRequest {
   sender: string;

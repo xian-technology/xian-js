@@ -28,7 +28,7 @@ async function loadDefaultCompiler(): Promise<XianCompilerModule> {
     )) as XianCompilerModule;
   } catch (error) {
     throw new TransactionError(
-      "deployContract requires @xian-tech/compiler or an injected compiler",
+      "compileContractArtifacts requires @xian-tech/compiler or an injected compiler",
       { cause: error }
     );
   }

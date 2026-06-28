@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -32,14 +30,10 @@ function jsonResponse(value: Record<string, unknown>): Response {
   });
 }
 
-function sha256(value: string): string {
-  return createHash("sha256").update(value, "utf8").digest("hex");
-}
-
 describe.runIf(process.env.XIAN_WASM_COMPILER_TEST === "1")(
   "@xian-tech/client real WASM compiler integration",
   () => {
-    it("loads @xian-tech/compiler through the default deployContract path", async () => {
+    it("deploys source without submitting client-compiled IR", async () => {
       const signer = new Ed25519Signer("2".repeat(64));
       let signedPayload: Record<string, unknown> | null = null;
       const fetchFn = vi.fn(async (input: string | URL) => {
@@ -75,21 +69,13 @@ describe.runIf(process.env.XIAN_WASM_COMPILER_TEST === "1")(
       });
 
       expect(submission.txHash).toBe("WASMDEPLOY");
-      const artifacts = (
-        signedPayload?.kwargs as Record<string, unknown>
-      ).deployment_artifacts as Record<string, unknown>;
-      expect(artifacts).toMatchObject({
-        format: "xian_contract_artifact_v1",
-        module_name: "con_counter",
-        vm_profile: "xian_vm_v1"
+      expect(signedPayload?.kwargs).toMatchObject({
+        name: "con_counter",
+        code: COUNTER_SOURCE
       });
-      expect(artifacts.runtime_code).toBeUndefined();
-      expect((artifacts.hashes as Record<string, string>).source_sha256).toBe(
-        sha256(artifacts.source as string)
-      );
-      expect((artifacts.hashes as Record<string, string>).vm_ir_sha256).toBe(
-        sha256(artifacts.vm_ir_json as string)
-      );
+      expect(
+        (signedPayload?.kwargs as Record<string, unknown>).deployment_artifacts
+      ).toBeUndefined();
     });
 
     it("compiles source through the installed WASM package without injection", async () => {
