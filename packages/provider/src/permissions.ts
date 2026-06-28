@@ -33,6 +33,8 @@ export type XianAutoApproveMethod =
   | "xian_sendTransaction"
   | "xian_sendCall";
 
+export type XianDappPolicyArgumentScope = "exact" | "any";
+
 export interface XianDappRequestContext {
   origin: string;
   account: string;
@@ -59,6 +61,7 @@ export interface XianDappPolicy {
   contract?: string;
   function?: string;
   maxChi?: XianNumber | string;
+  argumentScope?: XianDappPolicyArgumentScope;
   kwargs?: Record<string, unknown>;
   label?: string;
   createdAt: number;
@@ -150,18 +153,54 @@ function deepEqual(left: unknown, right: unknown): boolean {
   return false;
 }
 
-function kwargsMatch(
-  policyKwargs: Record<string, unknown> | undefined,
+function normalizeKwargs(
+  kwargs: Record<string, unknown> | undefined
+): Record<string, unknown> {
+  return kwargs ?? {};
+}
+
+function policyArgumentScope(
+  policy: XianDappPolicy
+): XianDappPolicyArgumentScope {
+  return policy.argumentScope === "any" ? "any" : "exact";
+}
+
+function methodsMatch(
+  left: XianAutoApproveMethod[],
+  right: XianAutoApproveMethod[]
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((method) => right.includes(method))
+  );
+}
+
+function policyArgumentsMatch(
+  policy: XianDappPolicy,
   actionKwargs: Record<string, unknown> | undefined
 ): boolean {
-  if (!policyKwargs || Object.keys(policyKwargs).length === 0) {
+  if (policyArgumentScope(policy) === "any") {
     return true;
   }
-  if (!actionKwargs) {
-    return false;
-  }
-  return Object.entries(policyKwargs).every(([key, value]) =>
-    deepEqual(actionKwargs[key], value)
+  return deepEqual(normalizeKwargs(policy.kwargs), normalizeKwargs(actionKwargs));
+}
+
+export function xianDappPoliciesHaveSameScope(
+  left: XianDappPolicy,
+  right: XianDappPolicy
+): boolean {
+  const leftArgumentScope = policyArgumentScope(left);
+  const rightArgumentScope = policyArgumentScope(right);
+  return (
+    left.origin === right.origin &&
+    left.account === right.account &&
+    left.chainId === right.chainId &&
+    left.contract === right.contract &&
+    left.function === right.function &&
+    methodsMatch(left.methods, right.methods) &&
+    leftArgumentScope === rightArgumentScope &&
+    (leftArgumentScope === "any" ||
+      deepEqual(normalizeKwargs(left.kwargs), normalizeKwargs(right.kwargs)))
   );
 }
 
@@ -285,7 +324,7 @@ export function evaluateXianDappPolicy(
       return { matched: false, action, reason: "chi limit exceeded" };
     }
   }
-  if (!kwargsMatch(policy.kwargs, action.kwargs)) {
+  if (!policyArgumentsMatch(policy, action.kwargs)) {
     return { matched: false, action, reason: "arguments mismatch" };
   }
 
@@ -321,6 +360,7 @@ export function createXianDappPolicyForRequest(input: {
   now: number;
   expiresAt?: number;
   label?: string;
+  argumentScope?: XianDappPolicyArgumentScope;
 }): XianDappPolicy | null {
   const action = parseXianDappAction(input.request);
   if (!action) {
@@ -331,6 +371,7 @@ export function createXianDappPolicyForRequest(input: {
   if (!contract || !fn) {
     return null;
   }
+  const argumentScope = input.argumentScope === "any" ? "any" : "exact";
   return {
     id: input.id,
     origin: input.origin,
@@ -340,6 +381,8 @@ export function createXianDappPolicyForRequest(input: {
     contract,
     function: fn,
     maxChi: action.chi,
+    argumentScope,
+    kwargs: argumentScope === "exact" ? normalizeKwargs(action.kwargs) : undefined,
     label: input.label ?? `${contract}.${fn}`,
     createdAt: input.now,
     updatedAt: input.now,

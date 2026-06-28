@@ -5,6 +5,7 @@ import {
   evaluateXianDappPolicy,
   findMatchingXianDappPolicy,
   parseXianDappAction,
+  xianDappPoliciesHaveSameScope,
   xianAccountFromCaip10,
   xianAccountToCaip10,
   xianChainIdFromCaip2,
@@ -112,7 +113,9 @@ describe("@xian-tech/provider permissions", () => {
       methods: ["xian_sendCall"],
       contract: "currency",
       function: "transfer",
-      maxChi: 500
+      maxChi: 500,
+      argumentScope: "exact",
+      kwargs: { to: "bob", amount: "5" }
     });
 
     expect(evaluateXianDappPolicy(policy!, context, request).matched).toBe(true);
@@ -146,6 +149,117 @@ describe("@xian-tech/provider permissions", () => {
         ]
       }).reason
     ).toBe("chi limit exceeded");
+    expect(
+      evaluateXianDappPolicy(policy!, context, {
+        method: "xian_sendCall",
+        params: [
+          {
+            intent: {
+              contract: "currency",
+              function: "transfer",
+              kwargs: { to: "mallory", amount: "5" },
+              chi: 500
+            }
+          }
+        ]
+      }).reason
+    ).toBe("arguments mismatch");
+    expect(
+      evaluateXianDappPolicy(policy!, context, {
+        method: "xian_sendCall",
+        params: [
+          {
+            intent: {
+              contract: "currency",
+              function: "transfer",
+              kwargs: { to: "bob", amount: "5", memo: "extra" },
+              chi: 500
+            }
+          }
+        ]
+      }).reason
+    ).toBe("arguments mismatch");
+  });
+
+  it("supports explicit broad trusted dapp policies", () => {
+    const request = {
+      method: "xian_sendCall",
+      params: [
+        {
+          intent: {
+            contract: "currency",
+            function: "transfer",
+            kwargs: { to: "bob", amount: "5" },
+            chi: 500
+          }
+        }
+      ]
+    };
+    const policy = createXianDappPolicyForRequest({
+      id: "policy-broad",
+      ...context,
+      request,
+      now: 1_000,
+      argumentScope: "any"
+    });
+
+    expect(policy).toMatchObject({
+      argumentScope: "any",
+      kwargs: undefined
+    });
+    expect(
+      evaluateXianDappPolicy(policy!, context, {
+        method: "xian_sendCall",
+        params: [
+          {
+            intent: {
+              contract: "currency",
+              function: "transfer",
+              kwargs: { to: "mallory", amount: "500" },
+              chi: 500
+            }
+          }
+        ]
+      }).matched
+    ).toBe(true);
+  });
+
+  it("treats exact kwargs as part of trusted policy scope", () => {
+    const base = {
+      id: "policy-1",
+      ...context,
+      methods: ["xian_sendCall" as const],
+      contract: "currency",
+      function: "transfer",
+      maxChi: 500,
+      argumentScope: "exact" as const,
+      createdAt: 1_000
+    };
+
+    expect(
+      xianDappPoliciesHaveSameScope(
+        { ...base, kwargs: { to: "bob", amount: "5" } },
+        { ...base, id: "policy-2", kwargs: { amount: "5", to: "bob" } }
+      )
+    ).toBe(true);
+    expect(
+      xianDappPoliciesHaveSameScope(
+        { ...base, kwargs: { to: "bob", amount: "5" } },
+        { ...base, id: "policy-3", kwargs: { to: "alice", amount: "5" } }
+      )
+    ).toBe(false);
+    expect(
+      xianDappPoliciesHaveSameScope(
+        { ...base, argumentScope: "any", kwargs: undefined },
+        { ...base, id: "policy-4", argumentScope: "any", kwargs: undefined }
+      )
+    ).toBe(true);
+    expect(
+      xianDappPoliciesHaveSameScope(
+        { ...base, argumentScope: "any", kwargs: undefined },
+        { ...base, id: "policy-5", kwargs: { to: "bob", amount: "5" } }
+      )
+    ).toBe(false);
   });
 
   it("finds the first matching policy", () => {
