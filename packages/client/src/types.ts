@@ -173,6 +173,14 @@ export interface XianEventListOptions extends XianPageOptions {
   afterId?: number;
 }
 
+export interface XianDexCandleOptions extends XianPageOptions {
+  source?: string;
+  contract?: string;
+  interval?: number | string;
+  start?: Date | number | string;
+  end?: Date | number | string;
+}
+
 export interface XianIndexedBlock {
   height: XianNumber | null;
   blockHash: string | null;
@@ -225,6 +233,26 @@ export interface XianRecentEventsResult {
   items: XianIndexedEvent[];
   limit: number;
   offset: number;
+}
+
+export interface XianDexCandle {
+  source: string | null;
+  marketId: string | null;
+  pairId: number | null;
+  bucketStart: string | null;
+  bucketEnd: string | null;
+  open: string | null;
+  high: string | null;
+  low: string | null;
+  close: string | null;
+  volumeToken0: string | null;
+  volumeToken1: string | null;
+  tradeCount: number | null;
+  firstBlockHeight: XianNumber | null;
+  lastBlockHeight: XianNumber | null;
+  firstEventId: number | null;
+  lastEventId: number | null;
+  raw: Record<string, unknown>;
 }
 
 export interface BroadcastTxOptions {

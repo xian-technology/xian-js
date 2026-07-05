@@ -28,6 +28,8 @@ import type {
   SimulateRequest,
   XianAbciQueryOptions,
   XianContractVars,
+  XianDexCandle,
+  XianDexCandleOptions,
   XianEventListOptions,
   XianIndexedBlock,
   XianIndexedEvent,
@@ -158,6 +160,20 @@ function normalizeMaybeRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function timestampPathParam(value: Date | number | string | undefined): string | null {
+  if (value === undefined) {
+    return null;
+  }
+  if (value instanceof Date) {
+    return String(Math.floor(value.getTime() / 1000));
+  }
+  if (typeof value === "string") {
+    const text = value.trim();
+    return text.endsWith("+00:00") ? `${text.slice(0, -6)}Z` : text || null;
+  }
+  return Number.isFinite(value) ? String(value) : null;
+}
+
 function pageLimit(options: XianPageOptions | undefined, fallback = 100): number {
   return clampPageSize(options?.limit, fallback);
 }
@@ -221,11 +237,46 @@ function normalizeIndexedEvent(item: Record<string, unknown>): XianIndexedEvent 
   };
 }
 
+function normalizeDexCandle(item: Record<string, unknown>): XianDexCandle {
+  return {
+    source: normalizeMaybeString(item.source),
+    marketId: normalizeMaybeString(item.market_id),
+    pairId: normalizeMaybeInteger(item.pair_id),
+    bucketStart: normalizeMaybeString(item.bucket_start),
+    bucketEnd: normalizeMaybeString(item.bucket_end),
+    open: normalizeMaybeString(item.open),
+    high: normalizeMaybeString(item.high),
+    low: normalizeMaybeString(item.low),
+    close: normalizeMaybeString(item.close),
+    volumeToken0: normalizeMaybeString(item.volume_token0),
+    volumeToken1: normalizeMaybeString(item.volume_token1),
+    tradeCount: normalizeMaybeInteger(item.trade_count),
+    firstBlockHeight: normalizeMaybeXianNumber(item.first_block_height),
+    lastBlockHeight: normalizeMaybeXianNumber(item.last_block_height),
+    firstEventId: normalizeMaybeInteger(item.first_event_id),
+    lastEventId: normalizeMaybeInteger(item.last_event_id),
+    raw: item
+  };
+}
+
 function normalizeIndexedEvents(value: unknown): XianIndexedEvent[] {
   return Array.isArray(value)
     ? value
         .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
         .map((item) => normalizeIndexedEvent(item))
+    : [];
+}
+
+function normalizeDexCandles(value: unknown): XianDexCandle[] {
+  const items = Array.isArray(value)
+    ? value
+    : value != null && typeof value === "object"
+      ? (value as Record<string, unknown>).items
+      : [];
+  return Array.isArray(items)
+    ? items
+        .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
+        .map((item) => normalizeDexCandle(item))
     : [];
 }
 
@@ -902,6 +953,31 @@ export class XianClient {
       limit: Number(payload.limit ?? limit),
       offset: Number(payload.offset ?? offset)
     };
+  }
+
+  async listDexCandles(
+    marketId: number | string,
+    options?: XianDexCandleOptions
+  ): Promise<XianDexCandle[]> {
+    const limit = pageLimit(options);
+    const offset = pageOffset(options);
+    const interval = options?.interval ?? "1m";
+    let path = `/dex_candles/${marketId}/interval=${interval}/limit=${limit}/offset=${offset}`;
+    if (options?.source) {
+      path += `/source=${options.source}`;
+    }
+    if (options?.contract) {
+      path += `/contract=${options.contract}`;
+    }
+    const start = timestampPathParam(options?.start);
+    const end = timestampPathParam(options?.end);
+    if (start !== null) {
+      path += `/start=${start}`;
+    }
+    if (end !== null) {
+      path += `/end=${end}`;
+    }
+    return normalizeDexCandles(await this.abciValue<unknown>(path));
   }
 
   async getStateHistory(

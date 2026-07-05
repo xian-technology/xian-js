@@ -751,6 +751,49 @@ describe("@xian-tech/client", () => {
           }
         });
       }
+      if (
+        url.pathname.endsWith("/abci_query") &&
+        path.includes(
+          "/dex_candles/7/interval=5m/limit=25/offset=5/source=xian_pairs_v1/start=1767225600/end=1767225900"
+        )
+      ) {
+        return jsonResponse({
+          result: {
+            response: {
+              code: 0,
+              value: encodeBase64Utf8(
+                JSON.stringify({
+                  available: true,
+                  pair_id: 7,
+                  source: "xian_pairs_v1",
+                  market_id: "7",
+                  interval_seconds: 300,
+                  items: [
+                    {
+                      pair_id: 7,
+                      source: "xian_pairs_v1",
+                      market_id: "7",
+                      bucket_start: "2026-01-01T00:00:00Z",
+                      bucket_end: "2026-01-01T00:05:00Z",
+                      open: "1.0",
+                      high: "1.5",
+                      low: "0.9",
+                      close: "1.4",
+                      volume_token0: "12.5",
+                      volume_token1: "17.5",
+                      trade_count: 2,
+                      first_block_height: 100,
+                      last_block_height: 101,
+                      first_event_id: 40,
+                      last_event_id: 41
+                    }
+                  ]
+                })
+              )
+            }
+          }
+        });
+      }
       throw new Error(`unexpected URL: ${String(input)}`);
     }) as typeof fetch;
 
@@ -790,6 +833,35 @@ describe("@xian-tech/client", () => {
       limit: 3,
       offset: 0
     });
+    await expect(
+      client.listDexCandles(7, {
+        source: "xian_pairs_v1",
+        interval: "5m",
+        limit: 25,
+        offset: 5,
+        start: new Date("2026-01-01T00:00:00Z"),
+        end: 1767225900
+      })
+    ).resolves.toMatchObject([
+      {
+        source: "xian_pairs_v1",
+        marketId: "7",
+        pairId: 7,
+        bucketStart: "2026-01-01T00:00:00Z",
+        bucketEnd: "2026-01-01T00:05:00Z",
+        open: "1.0",
+        high: "1.5",
+        low: "0.9",
+        close: "1.4",
+        volumeToken0: "12.5",
+        volumeToken1: "17.5",
+        tradeCount: 2,
+        firstBlockHeight: 100,
+        lastBlockHeight: 101,
+        firstEventId: 40,
+        lastEventId: 41
+      }
+    ]);
   });
 
   it("reads shielded wallet history through the indexed wallet feed", async () => {
