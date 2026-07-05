@@ -185,7 +185,7 @@ export interface XianIndexedBlock {
 }
 
 export interface XianIndexedTransaction {
-  hash: string | null;
+  txHash: string | null;
   blockHeight: XianNumber | null;
   blockHash: string | null;
   blockTime: string | XianNumber | null;

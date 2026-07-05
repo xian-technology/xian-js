@@ -674,7 +674,7 @@ describe("@xian-tech/client", () => {
               value: encodeBase64Utf8(
                 JSON.stringify([
                   {
-                    hash: "TX-1",
+                    tx_hash: "TX-1",
                     block_height: 12,
                     tx_index: 0,
                     sender: "alice",
@@ -759,11 +759,10 @@ describe("@xian-tech/client", () => {
       fetchFn
     });
 
-    await expect(
-      client.listTxsByContract("governance", { limit: 10 })
-    ).resolves.toMatchObject([
+    const indexedTransactions = await client.listTxsByContract("governance", { limit: 10 });
+    expect(indexedTransactions).toMatchObject([
       {
-        hash: "TX-1",
+        txHash: "TX-1",
         blockHeight: 12,
         sender: "alice",
         contract: "governance",
@@ -773,6 +772,7 @@ describe("@xian-tech/client", () => {
         payload: { function: "vote" }
       }
     ]);
+    expect(indexedTransactions[0]?.raw).not.toHaveProperty("hash");
     await expect(
       client.listEvents("governance", "ProposalVoted", { afterId: 4, limit: 5 })
     ).resolves.toMatchObject([

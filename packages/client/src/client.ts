@@ -183,7 +183,7 @@ function normalizeIndexedTransaction(
   item: Record<string, unknown>
 ): XianIndexedTransaction {
   return {
-    hash: normalizeMaybeString(item.hash ?? item.tx_hash),
+    txHash: normalizeMaybeString(item.tx_hash),
     blockHeight: normalizeMaybeXianNumber(item.block_height),
     blockHash: normalizeMaybeString(item.block_hash),
     blockTime: normalizeMaybeString(item.block_time) ?? normalizeMaybeXianNumber(item.block_time),
