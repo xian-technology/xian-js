@@ -19,12 +19,12 @@ jobs:
         working-directory: xian-js
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: xian-js
 
       - name: Check out xian-contracting
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/xian-contracting
           ref: main
@@ -88,7 +88,7 @@ jobs:
           npm pack --workspace @xian-tech/web-kit --pack-destination release-dist
 
       - name: Upload release artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: release-dist
           path: xian-js/release-dist/*
@@ -110,7 +110,7 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Download release artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: release-dist
           path: release-dist
@@ -149,7 +149,7 @@ jobs:
       contents: write
     steps:
       - name: Download release artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: release-dist
           path: release-dist
