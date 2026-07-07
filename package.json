@@ -21,7 +21,7 @@
     "validate": "npm run typecheck && npm run build && npm run test"
   },
   "devDependencies": {
-    "@types/node": "^25.6.0",
+    "@types/node": "^26.1.0",
     "@xian-tech/compiler": "file:../xian-contracting/packages/xian-compiler-core/npm",
     "typescript": "^6.0.3",
     "vite-plugin-wasm": "^3.6.0",
