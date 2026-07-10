@@ -37,6 +37,7 @@ export {
 export {
   ProviderChainMismatchError,
   ProviderDisconnectedError,
+  ProviderNonceReservationError,
   ProviderUnauthorizedError,
   ProviderUnsupportedMethodError,
   XianProviderError

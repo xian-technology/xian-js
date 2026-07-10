@@ -7,12 +7,17 @@ export {
 } from "./relayer.js";
 export {
   Ed25519Signer,
+  XIAN_SIGNED_MESSAGE_VERSION,
+  createXianMessageSigningPayload,
   generatePrivateKey,
   isValidEd25519Key,
   isValidEd25519Signature,
   publicKeyFromPrivateKey,
   signMessage,
-  verifyMessage
+  signXianMessage,
+  verifyMessage,
+  verifyXianMessage,
+  type XianSignedMessageInput
 } from "./ed25519.js";
 export {
   canonicalizeRuntime,
@@ -27,6 +32,7 @@ export {
 } from "./shielded.js";
 export {
   AbciError,
+  NonceReservationError,
   RpcError,
   SimulationError,
   TransactionError,

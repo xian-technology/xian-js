@@ -27,3 +27,9 @@ export interface XianSignedTransaction {
     signature: string;
   };
 }
+
+export {
+  XIAN_SIGNED_MESSAGE_VERSION,
+  createXianMessageSigningPayload,
+  type XianSignedMessageInput
+} from "./message-signing.js";

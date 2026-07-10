@@ -14,6 +14,7 @@ import {
 } from "./encoding.js";
 import { isValidEd25519Signature } from "./ed25519.js";
 import { AbciError, RpcError, SimulationError, TransactionError, TransportError, TxTimeoutError } from "./errors.js";
+import { NonceReservationManager } from "./nonce-reservation.js";
 import { WatchApi } from "./watch.js";
 import type {
   BroadcastMode,
@@ -416,6 +417,7 @@ export class XianClient {
 
   private readonly fetchFn: typeof fetch;
   private readonly requestTimeoutMs: number;
+  private readonly nonceReservations = new NonceReservationManager();
   private chainIdCache?: string;
 
   constructor(options: XianClientOptions) {
@@ -1187,13 +1189,70 @@ export class XianClient {
       pollIntervalMs?: number;
     }
   ): Promise<TransactionSubmission> {
-    const tx = await this.buildTx(request);
-    const signedTx = await this.signTx(tx, request.signer);
-    return this.broadcastTx(signedTx, {
+    if (request.mode != null && !["async", "checktx", "commit"].includes(request.mode)) {
+      throw new TransactionError("mode must be one of: async, checktx, commit");
+    }
+    const broadcastOptions = {
       mode: request.mode,
       waitForTx: request.waitForTx,
       timeoutMs: request.timeoutMs,
       pollIntervalMs: request.pollIntervalMs
+    };
+
+    if (request.nonce != null) {
+      const tx = await this.buildTx(request);
+      const signedTx = await this.signTx(tx, request.signer);
+      return this.broadcastTx(signedTx, broadcastOptions);
+    }
+
+    const chainId = request.chainId ?? (await this.getChainId());
+    const scope = { chainId, sender: request.sender };
+    return this.nonceReservations.runExclusive(scope, async () => {
+      const reservation = await this.nonceReservations.reserve(
+        scope,
+        () => this.getNonce(request.sender)
+      );
+      let broadcastAttempted = false;
+      try {
+        const tx = await this.buildTx({
+          ...request,
+          chainId,
+          nonce: reservation.nonce
+        });
+        const signedTx = await this.signTx(tx, request.signer);
+        await this.nonceReservations.assertCanBroadcast(reservation);
+        broadcastAttempted = true;
+        let submission: TransactionSubmission;
+        try {
+          submission = await this.broadcastTx(signedTx, broadcastOptions);
+        } catch (error) {
+          await this.nonceReservations.quarantine(reservation);
+          throw error;
+        }
+
+        if (!submission.submitted || submission.accepted === false) {
+          await this.nonceReservations.reject(reservation);
+        } else {
+          await this.nonceReservations.confirm(reservation);
+        }
+        return submission;
+      } catch (error) {
+        if (!broadcastAttempted) {
+          await this.nonceReservations.release(reservation);
+        }
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Clear local automatic-nonce state after the caller has independently
+   * reconciled an ambiguous broadcast outcome with the network.
+   */
+  async resetNonceReservation(sender: string, chainId?: string): Promise<void> {
+    await this.nonceReservations.reset({
+      sender,
+      chainId: chainId ?? (await this.getChainId())
     });
   }
 

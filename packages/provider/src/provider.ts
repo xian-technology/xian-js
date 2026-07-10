@@ -4,6 +4,8 @@ import {
   ProviderUnauthorizedError,
   ProviderUnsupportedMethodError
 } from "./errors.js";
+import { NonceReservationManager } from "./nonce-reservation.js";
+import { createXianMessageSigningPayload } from "@xian-tech/types";
 import type {
   BroadcastMode,
   XianNumber,
@@ -105,6 +107,7 @@ export interface XianProviderClient {
     function: string;
     kwargs: Record<string, unknown>;
     chainId?: string;
+    nonce?: XianNumber;
     chi?: XianNumber;
     chiSupplied?: XianNumber;
   }): Promise<XianUnsignedTransaction>;
@@ -189,6 +192,7 @@ function parseOptionalXianNumber(
 
 export class InMemoryXianProvider implements XianProvider {
   private readonly events = new EventEmitter();
+  private readonly nonceReservations = new NonceReservationManager();
   private readonly watchedAssets = new Map<string, XianWatchedAsset>();
   private connected = false;
   private chainId?: string;
@@ -303,21 +307,25 @@ export class InMemoryXianProvider implements XianProvider {
     this.requireUnlocked();
   }
 
-  private async prepareTransaction(intent: XianTransactionIntent): Promise<XianUnsignedTransaction> {
+  private async prepareTransaction(
+    intent: XianTransactionIntent,
+    options?: { chainId?: string; sender?: string; nonce?: XianNumber }
+  ): Promise<XianUnsignedTransaction> {
     if (!this.options.client) {
       throw new TypeError("provider client is required for xian_prepareTransaction");
     }
-    const activeChainId = await this.ensureChainId();
+    const activeChainId = options?.chainId ?? (await this.ensureChainId());
     if (intent.chainId && intent.chainId !== activeChainId) {
       throw new ProviderChainMismatchError();
     }
 
     return this.options.client.buildTx({
-      sender: await this.getAddress(),
+      sender: options?.sender ?? (await this.getAddress()),
       contract: intent.contract,
       function: intent.function,
       kwargs: intent.kwargs,
       chainId: activeChainId,
+      ...(options?.nonce == null ? {} : { nonce: options.nonce }),
       chi: parseOptionalXianNumber(intent.chi, "chi"),
       chiSupplied: parseOptionalXianNumber(
         intent.chiSupplied,
@@ -388,6 +396,17 @@ export class InMemoryXianProvider implements XianProvider {
     return [...this.watchedAssets.values()];
   }
 
+  /**
+   * Clear local automatic-nonce state after the wallet owner has independently
+   * reconciled an ambiguous broadcast outcome with the network.
+   */
+  async resetNonceReservation(chainId?: string): Promise<void> {
+    await this.nonceReservations.reset({
+      chainId: chainId ?? (await this.ensureChainId()),
+      sender: await this.getAddress()
+    });
+  }
+
   async request(args: XianProviderRequest): Promise<unknown> {
     switch (args.method) {
       case "xian_connect":
@@ -422,7 +441,13 @@ export class InMemoryXianProvider implements XianProvider {
         if (typeof message !== "string") {
           throw new TypeError("xian_signMessage requires a message string");
         }
-        return this.options.signer.signMessage(message);
+        const [account, chainId] = await Promise.all([
+          this.getAddress(),
+          this.ensureChainId()
+        ]);
+        return this.options.signer.signMessage(
+          createXianMessageSigningPayload({ account, chainId, message })
+        );
       }
 
       case "xian_signTransaction": {
@@ -464,24 +489,73 @@ export class InMemoryXianProvider implements XianProvider {
 
       case "xian_sendCall": {
         await this.requireConnected();
-        if (!this.options.client) {
+        const client = this.options.client;
+        if (!client) {
           throw new TypeError("provider client is required for xian_sendCall");
         }
         const { intent, mode, waitForTx, timeoutMs, pollIntervalMs } = firstParamObject(
           args.params
         );
-        const preparedTx = await this.prepareTransaction(
-          intent as XianTransactionIntent
-        );
-        const signedTx = await this.options.client.signTx(
-          preparedTx,
-          this.options.signer
-        );
-        return this.options.client.broadcastTx(signedTx, {
-          mode: mode as BroadcastMode | undefined,
-          waitForTx: waitForTx as boolean | undefined,
-          timeoutMs: timeoutMs as number | undefined,
-          pollIntervalMs: pollIntervalMs as number | undefined
+        if (mode != null && !["async", "checktx", "commit"].includes(String(mode))) {
+          throw new TypeError("mode must be one of: async, checktx, commit");
+        }
+        const transactionIntent = intent as XianTransactionIntent;
+        const chainId = await this.ensureChainId();
+        if (transactionIntent.chainId && transactionIntent.chainId !== chainId) {
+          throw new ProviderChainMismatchError();
+        }
+        const sender = await this.getAddress();
+        const scope = { chainId, sender };
+        return this.nonceReservations.runExclusive(scope, async () => {
+          let preparedTx: XianUnsignedTransaction | undefined;
+          const reservation = await this.nonceReservations.reserve(
+            scope,
+            async () => {
+              preparedTx = await this.prepareTransaction(transactionIntent, {
+                chainId,
+                sender
+              });
+              return preparedTx.payload.nonce;
+            }
+          );
+          let broadcastAttempted = false;
+          try {
+            preparedTx ??= await this.prepareTransaction(transactionIntent, {
+              chainId,
+              sender,
+              nonce: reservation.nonce
+            });
+            const signedTx = await client.signTx(
+              preparedTx,
+              this.options.signer
+            );
+            await this.nonceReservations.assertCanBroadcast(reservation);
+            broadcastAttempted = true;
+            let submission: TransactionSubmission;
+            try {
+              submission = await client.broadcastTx(signedTx, {
+                mode: mode as BroadcastMode | undefined,
+                waitForTx: waitForTx as boolean | undefined,
+                timeoutMs: timeoutMs as number | undefined,
+                pollIntervalMs: pollIntervalMs as number | undefined
+              });
+            } catch (error) {
+              await this.nonceReservations.quarantine(reservation);
+              throw error;
+            }
+
+            if (!submission.submitted || submission.accepted === false) {
+              await this.nonceReservations.reject(reservation);
+            } else {
+              await this.nonceReservations.confirm(reservation);
+            }
+            return submission;
+          } catch (error) {
+            if (!broadcastAttempted) {
+              await this.nonceReservations.release(reservation);
+            }
+            throw error;
+          }
         });
       }
 

@@ -36,4 +36,25 @@ export class SimulationError extends XianClientError {
 
 export class TransactionError extends XianClientError {}
 
+export class NonceReservationError extends TransactionError {
+  readonly sender: string;
+  readonly chainId: string;
+  readonly nonce: number | bigint;
+
+  constructor(options: {
+    sender: string;
+    chainId: string;
+    nonce: number | bigint;
+  }) {
+    super(
+      `automatic nonce ${String(options.nonce)} for ${options.sender} on ` +
+        `${options.chainId} has an ambiguous broadcast outcome; wait for the ` +
+        "network nonce to advance or explicitly reset the nonce reservation"
+    );
+    this.sender = options.sender;
+    this.chainId = options.chainId;
+    this.nonce = options.nonce;
+  }
+}
+
 export class TxTimeoutError extends XianClientError {}

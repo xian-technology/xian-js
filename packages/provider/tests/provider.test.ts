@@ -136,6 +136,17 @@ describe("@xian-tech/provider", () => {
     await expect(provider.request({ method: "xian_chainId" })).resolves.toBe(
       "xian-testnet"
     );
+    await expect(
+      provider.request({
+        method: "xian_signMessage",
+        params: [{ message: "hello" }]
+      })
+    ).resolves.toContain("Xian Signed Message");
+    expect(signer.signMessage).toHaveBeenLastCalledWith(
+      `\u0019Xian Signed Message:\n1\nchain-id:12:xian-testnet\naccount:64:${"a".repeat(
+        64
+      )}\nmessage:5:hello`
+    );
 
     await provider.request({ method: "xian_disconnect" });
     await expect(

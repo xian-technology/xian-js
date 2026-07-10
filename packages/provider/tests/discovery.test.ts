@@ -154,7 +154,11 @@ describe("@xian-tech/provider injected discovery", () => {
         name: "Wrapped Wallet"
       }
     });
-    await expect(wallet?.signMessage("hello")).resolves.toBe("sig:hello");
+    await expect(wallet?.signMessage("hello")).resolves.toBe(
+      `sig:\u0019Xian Signed Message:\n1\nchain-id:10:xian-local\naccount:64:${"f".repeat(
+        64
+      )}\nmessage:5:hello`
+    );
     await expect(
       wallet?.watchAsset({
         type: "token",
@@ -197,8 +201,21 @@ describe("@xian-tech/provider injected discovery", () => {
 
     const providerSigner = wallet?.asSigner();
     await expect(providerSigner?.getAddress()).resolves.toBe("f".repeat(64));
-    await expect(providerSigner?.signMessage("world")).resolves.toBe(
-      "sig:world"
+    await expect(
+      providerSigner?.signMessage(
+        JSON.stringify({
+          chain_id: "xian-local",
+          chi_supplied: 50_000,
+          contract: "currency",
+          function: "transfer",
+          kwargs: { amount: "5", to: "bob" },
+          nonce: 1,
+          sender: "f".repeat(64)
+        })
+      )
+    ).resolves.toBe("a".repeat(128));
+    await expect(providerSigner?.signMessage("world")).rejects.toThrow(
+      "canonical transaction payloads"
     );
   });
 

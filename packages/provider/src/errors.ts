@@ -33,3 +33,26 @@ export class ProviderUnsupportedMethodError extends XianProviderError {
     super(4200, `unsupported provider method: ${method}`);
   }
 }
+
+export class ProviderNonceReservationError extends XianProviderError {
+  readonly sender: string;
+  readonly chainId: string;
+  readonly nonce: number | bigint;
+
+  constructor(options: {
+    sender: string;
+    chainId: string;
+    nonce: number | bigint;
+  }) {
+    super(
+      -32000,
+      `automatic nonce ${String(options.nonce)} for ${options.sender} on ` +
+        `${options.chainId} has an ambiguous broadcast outcome; wait for the ` +
+        "network nonce to advance or explicitly reset the nonce reservation",
+      options
+    );
+    this.sender = options.sender;
+    this.chainId = options.chainId;
+    this.nonce = options.nonce;
+  }
+}

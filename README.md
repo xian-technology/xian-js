@@ -151,6 +151,27 @@ const submission = await client.token("currency").transfer({
 console.log(submission.txHash, submission.accepted, submission.finalized);
 ```
 
+Automatic sends reserve nonces per `XianClient`, chain, and sender. Concurrent
+`sendTx(...)` calls (including contract and token convenience helpers) therefore
+run their build, sign, and broadcast lifecycles in nonce order and use distinct
+sequential nonces. Different senders and chains remain concurrent. Supplying
+`nonce` explicitly bypasses this coordination, and `buildTx(...)` remains a
+snapshot operation that does not hold a reservation.
+
+Known pre-broadcast failures and structured RPC or CheckTx rejections release
+the automatic reservation. A thrown transport error or finalization timeout
+after broadcast is ambiguous, so the sender is quarantined from further
+automatic sends until `get_next_nonce` proves that the network advanced.
+`NonceReservationError` identifies that state. After independently reconciling
+the transaction, a caller can deliberately clear it with:
+
+```ts
+await client.resetNonceReservation(signer.address, chainId);
+```
+
+This reset can allow reuse of a transaction that the network may already have
+accepted, so it should not be used as an automatic retry mechanism.
+
 Submit contract source:
 
 ```ts
@@ -181,6 +202,7 @@ artifact compilation remains available only as an offline utility.
 Use an injected wallet when a dapp must not see private keys:
 
 ```ts
+import { verifyXianMessage } from "@xian-tech/client";
 import { InjectedXianWallet } from "@xian-tech/provider";
 
 const wallet = await InjectedXianWallet.waitForInjected({ timeoutMs: 1_000 });
@@ -191,6 +213,14 @@ if (!wallet) {
 const [account] = await wallet.connect();
 const chainId = await wallet.getChainId();
 const info = await wallet.getWalletInfo();
+
+const message = "Authorize this login";
+const signature = await wallet.signMessage(message);
+const messageIsValid = verifyXianMessage(
+  account,
+  { account, chainId, message },
+  signature
+);
 
 const prepared = await wallet.prepareTransaction({
   chainId,
@@ -204,8 +234,15 @@ const sent = await wallet.sendTransaction(prepared, {
   waitForTx: true,
 });
 
-console.log(account, info.capabilities, signed, sent.txHash);
+console.log(account, info.capabilities, messageIsValid, signed, sent.txHash);
 ```
+
+`xian_signMessage` uses the version-1 Xian signed-message envelope. The signed
+bytes are length-prefixed and bound to both the active chain and account, so a
+signature cannot be replayed as a raw transaction payload or on another Xian
+chain/account. Dapps should verify wallet signatures with `verifyXianMessage`;
+`verifyMessage` and `signMessage` are low-level raw Ed25519 primitives retained
+for transaction internals and explicit low-level integrations.
 
 For the common dapp path, let the wallet prepare, sign, and broadcast from an
 intent:
@@ -221,6 +258,16 @@ const submission = await wallet.sendCall(
   { mode: "checktx", waitForTx: true },
 );
 ```
+
+The reference `InMemoryXianProvider` applies the same per-chain, per-sender
+ordered lifecycle to concurrent `xian_sendCall` requests. Prebuilt
+`xian_sendTransaction` payloads keep their explicit nonce and bypass the
+automatic manager. Wallet owners that have independently reconciled an
+ambiguous broadcast can call `provider.resetNonceReservation()`; this is an
+owner-side recovery method, not a provider request exposed to dapps.
+
+`ProviderBackedXianSigner` delegates canonical transaction payloads through
+`xian_signTransaction`. It does not expose a raw provider message-signing mode.
 
 Subscribe to dashboard websocket streams:
 

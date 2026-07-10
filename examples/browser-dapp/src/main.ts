@@ -1,6 +1,7 @@
 import {
   Ed25519Signer,
   XianClient,
+  verifyXianMessage,
   type TransactionSubmission,
   type WatchSubscription,
   type XianSignedTransaction,
@@ -389,8 +390,18 @@ q<HTMLButtonElement>("#read-balance").addEventListener("click", async () => {
 q<HTMLButtonElement>("#sign-message").addEventListener("click", async () => {
   try {
     const s = need();
-    const signature = await s.wallet.signMessage(messageInput.value);
-    messageOutput.textContent = JSON.stringify({ signature }, null, 2);
+    const message = messageInput.value;
+    const signature = await s.wallet.signMessage(message);
+    const account = s.address ?? (await s.wallet.connect())[0];
+    const chainId = await s.wallet.getChainId();
+    const verified = account
+      ? verifyXianMessage(account, { account, chainId, message }, signature)
+      : false;
+    messageOutput.textContent = JSON.stringify(
+      { signature, envelopeVersion: 1, chainId, account, verified },
+      null,
+      2
+    );
     log("signed message through provider");
   } catch (error) {
     log(fmtError(error));

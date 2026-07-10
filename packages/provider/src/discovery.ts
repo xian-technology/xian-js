@@ -241,8 +241,24 @@ export class ProviderBackedXianSigner implements XianSigner {
     return account;
   }
 
-  signMessage(message: string): Promise<string> {
-    return this.wallet.signMessage(message);
+  async signMessage(message: string): Promise<string> {
+    let payload: unknown;
+    try {
+      payload = JSON.parse(message);
+    } catch {
+      throw new ProviderUnauthorizedError(
+        "provider-backed signers accept only canonical transaction payloads"
+      );
+    }
+    if (typeof payload !== "object" || payload == null || Array.isArray(payload)) {
+      throw new ProviderUnauthorizedError(
+        "provider-backed signer payload must be a transaction object"
+      );
+    }
+    const signed = await this.wallet.signTransaction({
+      payload: payload as XianUnsignedTransaction["payload"]
+    });
+    return signed.metadata.signature;
   }
 }
 

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "components": {
+    "xian-contracting": {
+      "repository": "xian-technology/xian-contracting",
+      "ref": "548ad9fc996f5adf7c4101ba18ead298f9f21f45",
+      "packages": {
+        "@xian-tech/compiler": {
+          "version": "0.1.4-beta.1",
+          "path": "packages/xian-compiler-core/npm/package.json"
+        }
+      }
+    }
+  }
+}

@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   Ed25519Signer,
   canonicalizeRuntime,
+  createXianMessageSigningPayload,
   decodeRuntime,
   encodeRuntime,
   isValidEd25519Key,
   isValidEd25519Signature,
   parseXianNumber,
-  verifyMessage
+  signXianMessage,
+  verifyMessage,
+  verifyXianMessage
 } from "../src/index";
 import { hexToBytes, normalizeMaybeInteger } from "../src/encoding";
 
@@ -75,6 +78,39 @@ describe("@xian-tech/client encoding", () => {
     const signature = signer.signMessage(message);
     expect(signature).toHaveLength(128);
     expect(verifyMessage(signer.address, message, signature)).toBe(true);
+  });
+
+  it("domain-separates external messages by version, chain, and account", () => {
+    const privateKey = "1".repeat(64);
+    const signer = new Ed25519Signer(privateKey);
+    const input = {
+      account: signer.address,
+      chainId: "xian-local",
+      message: "approve snowman ☃"
+    };
+    const payload = createXianMessageSigningPayload(input);
+    expect(payload).toBe(
+      `\u0019Xian Signed Message:\n1\nchain-id:10:xian-local\naccount:64:${signer.address}\nmessage:19:approve snowman ☃`
+    );
+
+    const signature = signXianMessage(privateKey, input);
+    expect(verifyXianMessage(signer.address, input, signature)).toBe(true);
+    expect(verifyMessage(signer.address, input.message, signature)).toBe(false);
+    expect(
+      verifyXianMessage(
+        signer.address,
+        { ...input, chainId: "xian-other" },
+        signature
+      )
+    ).toBe(false);
+    const otherAccount = new Ed25519Signer("2".repeat(64)).address;
+    expect(
+      verifyXianMessage(
+        signer.address,
+        { ...input, account: otherAccount },
+        signature
+      )
+    ).toBe(false);
   });
 
   it("rejects non-hex key and signature material", () => {

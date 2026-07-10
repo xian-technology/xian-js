@@ -8,7 +8,26 @@ on:
     branches:
       - "*"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  workflow-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Lint GitHub Actions workflows
+        uses: raven-actions/actionlint@e01d1ea33dd6a5ed517d95b4c0c357560ac6f518 # v2.1.1
+        with:
+          version: 1.7.12
+          pyflakes: false
+
   validate:
     runs-on: ubuntu-latest
     defaults:
@@ -16,20 +35,32 @@ jobs:
         working-directory: xian-js
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           path: xian-js
 
       - name: Check out xian-contracting
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           repository: ${{ github.repository_owner }}/xian-contracting
           ref: main
           path: xian-contracting
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Check out xian-meta
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
+          repository: ${{ github.repository_owner }}/xian-meta
+          ref: main
+          path: xian-meta
+
+      - name: Report resolved sibling SHAs
+        working-directory: ${{ github.workspace }}
+        run: python3 xian-meta/scripts/report_workspace_shas.py --workspace-root .
+
+      - name: Set up Rust 1.96.1
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          toolchain: 1.96.1
           targets: wasm32-unknown-unknown
 
       - name: Install wasm-pack
@@ -40,17 +71,20 @@ jobs:
           wasm-pack --version
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: "24"
+          node-version: "24.18.0"
           cache: npm
           cache-dependency-path: xian-js/package-lock.json
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build shared compiler
         run: npm run build:compiler
+
+      - name: Run compiler WASM integration tests
+        run: npm run test:compiler
 
       - name: Audit production dependencies
         run: npm audit --audit-level=critical --omit=dev

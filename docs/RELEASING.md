@@ -4,7 +4,10 @@
 
 - validation runs on pushes and pull requests
 - publishing happens only from a git tag
-- the release tag format is `vX.Y.Z`
+- the release tag format is `vX.Y.Z`, with optional `alpha.N`, `beta.N`, or
+  `rc.N` prerelease suffixes
+- `release-manifest.json` pins every sibling build input by commit SHA and
+  source-package version
 
 ## Version Policy
 
@@ -41,33 +44,46 @@ Release checklist:
 
 ## Tag Workflow
 
-1. Update every publishable package manifest to the intended release version:
+1. Update the root and every publishable package manifest to the intended
+   release version:
+   `package.json`,
    `packages/client/package.json`, `packages/provider/package.json`,
    `packages/types/package.json`, and `packages/web-kit/package.json`.
-2. Run `npm install` if package metadata changed.
-3. Run `npm run validate`.
-4. Commit the release version changes.
-5. Create and push a tag in the form `vX.Y.Z`.
+2. Run `npm install` if package metadata changed and commit the resulting
+   `package-lock.json` update.
+3. Update `release-manifest.json` to the exact released `xian-contracting`
+   commit used for this SDK release. Its compiler version must match both that
+   source checkout and the local file entry in `package-lock.json`.
+4. Run `node scripts/release-context.mjs validate-manifest`.
+5. Run `npm ci`, `npm audit --audit-level=critical --omit=dev`, and
+   `npm run validate`.
+6. Commit the release version and manifest changes from a clean tree.
+7. Create and push a tag in the form `vX.Y.Z`.
 
 ## What The Release Workflow Does
 
-On `v*` tags, GitHub Actions will:
+On an accepted release tag, GitHub Actions will:
 
-1. install dependencies
-2. run `npm run validate`
-3. verify that the package versions match the tag
-4. build npm tarballs for the publishable packages
-5. publish them to npm with trusted publishing
-6. create a GitHub release from the same tag
+1. verify the tag grammar and resolve the tag and trigger to one clean source SHA
+2. validate every repo, package, lockfile, and sibling-manifest version
+3. check out `xian-contracting` at the manifest's exact commit SHA
+4. install locked dependencies, audit production dependencies, and run the
+   complete workspace validation
+5. build and inspect npm tarballs for every publishable package
+6. upload those validated immutable artifacts
+7. publish only the downloaded artifacts to npm with trusted publishing
+8. create a GitHub release from the same tag and artifacts
 
-The npm publish step is all-or-fail for package versions that are not already on
-npm. A package that is already published is skipped, but any new package version
-that cannot be published fails the release workflow instead of creating a
-partial release.
+The npm publish step is all-or-fail for new package versions. A version already
+on npm is skipped only when its registry integrity exactly matches the validated
+tarball; a mismatch fails closed.
 
 ## Notes
 
 - Do not tag from a dirty tree.
+- Do not pin a moving branch or an unversioned sibling checkout in the release
+  manifest. Release validation must reflect the source package consumers can
+  actually install.
 - If `xian-wallet-browser` needs the new SDK version, release `xian-js` first.
 - npm trusted publishing must be configured for each publishable package before
   the workflow can publish successfully.

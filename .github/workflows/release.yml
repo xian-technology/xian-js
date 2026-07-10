@@ -10,7 +10,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release-context:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      source_sha: ${{ steps.resolve.outputs.source_sha }}
+      version: ${{ steps.resolve.outputs.version }}
+      xian_contracting_repository: ${{ steps.resolve.outputs.xian_contracting_repository }}
+      xian_contracting_ref: ${{ steps.resolve.outputs.xian_contracting_ref }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+          path: xian-js
+          ref: ${{ github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "24.18.0"
+
+      - name: Resolve immutable release context
+        id: resolve
+        working-directory: xian-js
+        env:
+          GITHUB_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          TRIGGER_SHA: ${{ github.sha }}
+        run: node ./scripts/release-context.mjs resolve
+
   build:
+    needs: release-context
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -18,21 +50,23 @@ jobs:
       run:
         working-directory: xian-js
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
+      - name: Check out immutable release source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           path: xian-js
+          ref: ${{ needs.release-context.outputs.source_sha }}
 
-      - name: Check out xian-contracting
-        uses: actions/checkout@v7
+      - name: Check out pinned xian-contracting source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
-          repository: ${{ github.repository_owner }}/xian-contracting
-          ref: main
+          repository: ${{ needs.release-context.outputs.xian_contracting_repository }}
+          ref: ${{ needs.release-context.outputs.xian_contracting_ref }}
           path: xian-contracting
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Rust 1.96.1
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
+          toolchain: 1.96.1
           targets: wasm32-unknown-unknown
 
       - name: Install wasm-pack
@@ -43,41 +77,30 @@ jobs:
           wasm-pack --version
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: "24"
+          node-version: "24.18.0"
           cache: npm
           cache-dependency-path: xian-js/package-lock.json
 
-      - name: Install dependencies
-        run: npm install
+      - name: Verify pinned source and package context
+        env:
+          COMPONENT_CHECKOUT: ${{ github.workspace }}/xian-contracting
+          EXPECTED_SOURCE_SHA: ${{ needs.release-context.outputs.source_sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node ./scripts/release-context.mjs verify-component
+
+      - name: Install locked dependencies
+        run: npm ci
 
       - name: Build shared compiler
         run: npm run build:compiler
 
+      - name: Audit production dependencies
+        run: npm audit --audit-level=critical --omit=dev
+
       - name: Validate workspace
         run: npm run validate
-
-      - name: Verify package versions match tag
-        run: |
-          node <<'NODE'
-          const fs = require("node:fs");
-
-          const expected = process.env.GITHUB_REF_NAME.replace(/^v/, "");
-          const packageFiles = [
-            "packages/types/package.json",
-            "packages/client/package.json",
-            "packages/provider/package.json",
-            "packages/web-kit/package.json"
-          ];
-
-          for (const file of packageFiles) {
-            const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
-            if (pkg.version !== expected) {
-              throw new Error(`${file} has version ${pkg.version}, expected ${expected}`);
-            }
-          }
-          NODE
 
       - name: Pack published packages
         run: |
@@ -87,8 +110,14 @@ jobs:
           npm pack --workspace @xian-tech/provider --pack-destination release-dist
           npm pack --workspace @xian-tech/web-kit --pack-destination release-dist
 
-      - name: Upload release artifacts
-        uses: actions/upload-artifact@v7
+      - name: Verify release artifact metadata
+        env:
+          ARTIFACT_DIRECTORY: release-dist
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node ./scripts/release-context.mjs verify-artifacts
+
+      - name: Upload validated release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-dist
           path: xian-js/release-dist/*
@@ -96,7 +125,9 @@ jobs:
           retention-days: 14
 
   publish:
-    needs: build
+    needs:
+      - release-context
+      - build
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -104,35 +135,61 @@ jobs:
       name: npm
     steps:
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: "24"
+          node-version: "24.18.0"
           registry-url: https://registry.npmjs.org
 
-      - name: Download release artifacts
-        uses: actions/download-artifact@v8
+      - name: Download validated release artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: release-dist
           path: release-dist
 
       - name: Publish packages to npm
+        env:
+          EXPECTED_VERSION: ${{ needs.release-context.outputs.version }}
         run: |
-          for package in \
-            release-dist/xian-tech-types-*.tgz \
-            release-dist/xian-tech-client-*.tgz \
-            release-dist/xian-tech-provider-*.tgz \
-            release-dist/xian-tech-web-kit-*.tgz
-          do
+          shopt -s nullglob
+          packages=(release-dist/*.tgz)
+          if [ "${#packages[@]}" -ne 4 ]; then
+            echo "Expected four npm artifacts, found ${#packages[@]}" >&2
+            exit 1
+          fi
+
+          for package in "${packages[@]}"; do
             metadata="$(
               tar -xOf "$package" package/package.json \
                 | node -e 'let input = ""; process.stdin.on("data", chunk => input += chunk); process.stdin.on("end", () => { const pkg = JSON.parse(input); console.log(pkg.name + "\t" + pkg.version); });'
             )"
             name="${metadata%%$'\t'*}"
             version="${metadata#*$'\t'}"
-            if npm view "${name}@${version}" version >/dev/null 2>&1; then
-              echo "${name}@${version} is already published; skipping"
+            case "${name}" in
+              @xian-tech/types|@xian-tech/client|@xian-tech/provider|@xian-tech/web-kit) ;;
+              *) echo "Unexpected package: ${name}" >&2; exit 1 ;;
+            esac
+            if [ "${version}" != "${EXPECTED_VERSION}" ]; then
+              echo "${name} has version ${version}, expected ${EXPECTED_VERSION}" >&2
+              exit 1
+            fi
+
+            if published_integrity="$(npm view "${name}@${version}" dist.integrity 2>/dev/null)"; then
+              local_integrity="$(
+                node - "$package" <<'NODE'
+          const crypto = require("node:crypto");
+          const fs = require("node:fs");
+          const archive = fs.readFileSync(process.argv[2]);
+          console.log(`sha512-${crypto.createHash("sha512").update(archive).digest("base64")}`);
+          NODE
+              )"
+              if [ -z "${published_integrity}" ] || [ "${published_integrity}" != "${local_integrity}" ]; then
+                echo "Published ${name}@${version} does not match the validated artifact" >&2
+                exit 1
+              fi
+              echo "${name}@${version} already exists with matching integrity; skipping"
               continue
             fi
+
             publish_tag="latest"
             if [[ "${version}" == *"-"* ]]; then
               publish_tag="beta"
@@ -142,14 +199,15 @@ jobs:
 
   github-release:
     needs:
+      - release-context
       - build
       - publish
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download release artifacts
-        uses: actions/download-artifact@v8
+      - name: Download validated release artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: release-dist
           path: release-dist
@@ -157,6 +215,7 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.release-context.outputs.version }}
         run: |
           release_flags=()
           if [[ "${GITHUB_REF_NAME}" == *"-"* ]]; then
@@ -165,6 +224,6 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" release-dist/* \
             --repo "${GITHUB_REPOSITORY}" \
             --verify-tag \
-            --title "xian-js ${GITHUB_REF_NAME#v}" \
+            --title "xian-js ${RELEASE_VERSION}" \
             --generate-notes \
             "${release_flags[@]}"

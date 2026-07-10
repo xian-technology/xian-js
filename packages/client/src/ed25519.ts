@@ -1,4 +1,9 @@
 import nacl from "tweetnacl";
+import {
+  XIAN_SIGNED_MESSAGE_VERSION,
+  createXianMessageSigningPayload,
+  type XianSignedMessageInput
+} from "@xian-tech/types";
 
 import { bytesToHex, hexToBytes, utf8ToBytes } from "./encoding.js";
 import { TransactionError } from "./errors.js";
@@ -6,6 +11,12 @@ import type { XianSigner } from "./types.js";
 
 const KEY_HEX_LENGTH = 64;
 const SIGNATURE_HEX_LENGTH = 128;
+
+export {
+  XIAN_SIGNED_MESSAGE_VERSION,
+  createXianMessageSigningPayload,
+  type XianSignedMessageInput
+};
 
 function isHexString(value: string, expectedLength: number): boolean {
   if (value.length !== expectedLength) {
@@ -37,6 +48,11 @@ export function publicKeyFromPrivateKey(privateKey: string): string {
   return bytesToHex(keyPair.publicKey);
 }
 
+/**
+ * Low-level raw Ed25519 signing primitive. Transaction signing depends on these
+ * exact bytes. User-facing wallet message requests must use the versioned Xian
+ * signed-message envelope instead.
+ */
 export function signMessage(privateKey: string, message: string): string {
   assertEd25519PrivateKey(privateKey);
   const keyPair = nacl.sign.keyPair.fromSeed(hexToBytes(privateKey));
@@ -44,6 +60,7 @@ export function signMessage(privateKey: string, message: string): string {
   return bytesToHex(signature);
 }
 
+/** Low-level counterpart to signMessage; see createXianMessageSigningPayload. */
 export function verifyMessage(publicKey: string, message: string, signature: string): boolean {
   if (!isValidEd25519Key(publicKey) || !isValidEd25519Signature(signature)) {
     return false;
@@ -54,6 +71,41 @@ export function verifyMessage(publicKey: string, message: string, signature: str
       utf8ToBytes(message),
       hexToBytes(signature),
       hexToBytes(publicKey)
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function signXianMessage(
+  privateKey: string,
+  input: XianSignedMessageInput
+): string {
+  assertEd25519PrivateKey(privateKey);
+  const account = publicKeyFromPrivateKey(privateKey);
+  if (input.account.trim().toLowerCase() !== account) {
+    throw new TransactionError("message signing account does not match private key");
+  }
+  return signMessage(
+    privateKey,
+    createXianMessageSigningPayload({ ...input, account })
+  );
+}
+
+export function verifyXianMessage(
+  publicKey: string,
+  input: XianSignedMessageInput,
+  signature: string
+): boolean {
+  const account = input.account.trim().toLowerCase();
+  if (!isValidEd25519Key(publicKey) || account !== publicKey.toLowerCase()) {
+    return false;
+  }
+  try {
+    return verifyMessage(
+      publicKey,
+      createXianMessageSigningPayload({ ...input, account }),
+      signature
     );
   } catch {
     return false;
