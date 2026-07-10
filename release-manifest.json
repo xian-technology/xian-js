@@ -3,10 +3,10 @@
   "components": {
     "xian-contracting": {
       "repository": "xian-technology/xian-contracting",
-      "ref": "548ad9fc996f5adf7c4101ba18ead298f9f21f45",
+      "ref": "a6ff49e3900b633f94c920df12172f4fc5c125f7",
       "packages": {
         "@xian-tech/compiler": {
-          "version": "0.1.4-beta.1",
+          "version": "0.2.0",
           "path": "packages/xian-compiler-core/npm/package.json"
         }
       }
