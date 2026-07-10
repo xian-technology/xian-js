@@ -130,6 +130,21 @@ describe("@xian-tech/client encoding", () => {
     expect(canonical).toBe('{"kwargs":{"memo":"snowman: ☃"}}');
   });
 
+  it("sorts nested unicode object keys by code point", () => {
+    const canonical = canonicalizeRuntime({
+      kwargs: {
+        nested: {
+          "😀": "grinning",
+          "\uE000": "private-use"
+        }
+      }
+    });
+
+    expect(canonical).toBe(
+      '{"kwargs":{"nested":{"\uE000":"private-use","😀":"grinning"}}}'
+    );
+  });
+
   it("canonicalizes runtime wrappers without decoding them", () => {
     const canonical = canonicalizeRuntime({
       kwargs: {

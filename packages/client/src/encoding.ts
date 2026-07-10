@@ -51,6 +51,22 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Object.prototype.toString.call(value) === "[object Object]";
 }
 
+function compareUnicodeCodePoints(left: string, right: string): number {
+  const leftPoints = Array.from(left);
+  const rightPoints = Array.from(right);
+  const length = Math.min(leftPoints.length, rightPoints.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const leftPoint = leftPoints[index]!.codePointAt(0)!;
+    const rightPoint = rightPoints[index]!.codePointAt(0)!;
+    if (leftPoint !== rightPoint) {
+      return leftPoint - rightPoint;
+    }
+  }
+
+  return leftPoints.length - rightPoints.length;
+}
+
 export function sortKeysDeep<T>(value: T): T {
   if (Array.isArray(value)) {
     return value.map((item) => sortKeysDeep(item)) as T;
@@ -60,7 +76,7 @@ export function sortKeysDeep<T>(value: T): T {
   }
 
   const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(value).sort()) {
+  for (const key of Object.keys(value).sort(compareUnicodeCodePoints)) {
     sorted[key] = sortKeysDeep(value[key]);
   }
   return sorted as T;
