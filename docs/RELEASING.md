@@ -74,9 +74,15 @@ On an accepted release tag, GitHub Actions will:
 7. publish only the downloaded artifacts to npm with trusted publishing
 8. create a GitHub release from the same tag and artifacts
 
-The npm publish step is all-or-fail for new package versions. A version already
-on npm is skipped only when its registry integrity exactly matches the validated
-tarball; a mismatch fails closed.
+The npm publish step is fail-closed for `@xian-tech/client`,
+`@xian-tech/provider`, and `@xian-tech/types`. A version already on npm is
+skipped only when its registry integrity exactly matches the validated tarball;
+a mismatch fails closed.
+
+`@xian-tech/web-kit` is still attached to the GitHub release as a validated
+tarball if npm rejects publication because the package-side trusted publisher
+or token permissions are not configured. Remove this exception after npm can
+publish `@xian-tech/web-kit` from the release workflow.
 
 ## Notes
 

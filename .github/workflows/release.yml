@@ -131,6 +131,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
+    outputs:
+      web_kit_published: ${{ steps.publish.outputs.web_kit_published }}
     environment:
       name: npm
     steps:
@@ -147,10 +149,12 @@ jobs:
           path: release-dist
 
       - name: Publish packages to npm
+        id: publish
         env:
           EXPECTED_VERSION: ${{ needs.release-context.outputs.version }}
         run: |
           shopt -s nullglob
+          web_kit_published=true
           packages=(release-dist/*.tgz)
           if [ "${#packages[@]}" -ne 4 ]; then
             echo "Expected four npm artifacts, found ${#packages[@]}" >&2
@@ -194,8 +198,17 @@ jobs:
             if [[ "${version}" == *"-"* ]]; then
               publish_tag="beta"
             fi
-            npm publish "./$package" --provenance --access public --tag "${publish_tag}"
+            if ! npm publish "./$package" --provenance --access public --tag "${publish_tag}"; then
+              if [ "${name}" = "@xian-tech/web-kit" ]; then
+                web_kit_published=false
+                echo "::warning::${name}@${version} could not be published to npm; keeping it in the GitHub release artifacts"
+                continue
+              fi
+              exit 1
+            fi
           done
+
+          echo "web_kit_published=${web_kit_published}" >> "${GITHUB_OUTPUT}"
 
   github-release:
     needs:
@@ -216,14 +229,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ needs.release-context.outputs.version }}
+          WEB_KIT_PUBLISHED: ${{ needs.publish.outputs.web_kit_published }}
         run: |
           release_flags=()
+          release_notes=()
           if [[ "${GITHUB_REF_NAME}" == *"-"* ]]; then
             release_flags+=(--prerelease)
+          fi
+          if [[ "${WEB_KIT_PUBLISHED}" != "true" ]]; then
+            release_notes+=(
+              --notes
+              $'NPM publish status:\n\n- Published to npm: `@xian-tech/client`, `@xian-tech/provider`, and `@xian-tech/types`.\n- Attached as a validated release artifact: `@xian-tech/web-kit`. npm publish for this package is blocked by npm package trusted-publisher/token permissions.\n'
+            )
           fi
           gh release create "${GITHUB_REF_NAME}" release-dist/* \
             --repo "${GITHUB_REPOSITORY}" \
             --verify-tag \
             --title "xian-js ${RELEASE_VERSION}" \
             --generate-notes \
+            "${release_notes[@]}" \
             "${release_flags[@]}"
