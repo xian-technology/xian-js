@@ -34,6 +34,12 @@ jobs:
           path: xian-js
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
 
+      - name: Check out release tooling
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          path: xian-js-release-tools
+          ref: ${{ github.sha }}
+
       - name: Resolve release tag commit
         id: release-tag
         working-directory: xian-js
@@ -51,7 +57,7 @@ jobs:
           RELEASE_REF_TYPE: tag
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
           TRIGGER_SHA: ${{ steps.release-tag.outputs.commit_sha }}
-        run: node ./scripts/release-context.mjs resolve
+        run: node ../xian-js-release-tools/scripts/release-context.mjs resolve
 
   build:
     needs: release-context
