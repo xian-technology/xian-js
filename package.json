@@ -17,7 +17,7 @@
     "build": "npm run build --workspace @xian-tech/types && npm run build --workspaces --if-present",
     "typecheck": "npm run build --workspace @xian-tech/types && npm run build --workspace @xian-tech/provider && npm run typecheck --workspaces --if-present",
     "test": "vitest run",
-    "test:compiler": "npm run build:compiler && XIAN_WASM_COMPILER_TEST=1 vitest run packages/client/tests/compiler-wasm.test.ts",
+    "test:compiler": "npm run build --workspace @xian-tech/types && npm run build:compiler && XIAN_WASM_COMPILER_TEST=1 vitest run packages/client/tests/compiler-wasm.test.ts",
     "test:release": "node --test scripts/release-context.node-test.mjs",
     "validate": "npm run typecheck && npm run build && npm run test && npm run test:release"
   },
