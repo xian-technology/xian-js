@@ -60,6 +60,22 @@ Release checklist:
 6. Commit the release version and manifest changes from a clean tree.
 7. Create and push a tag in the form `vX.Y.Z`.
 
+If npm package-side permissions blocked one package after a tag was already
+validated, fix the package trusted publisher in npm and run the `Release`
+workflow manually with `release_tag` set to the existing tag. The manual path
+checks out the immutable tag, validates the same artifacts, skips already
+published packages only when their registry integrity matches, and uploads
+artifacts to the existing GitHub release.
+
+Trusted publishing must be configured separately for each publishable npm
+package:
+
+- provider: GitHub Actions
+- organization/user: `xian-technology`
+- repository: `xian-js`
+- workflow: `release.yml`
+- environment: `npm`
+
 ## What The Release Workflow Does
 
 On an accepted release tag, GitHub Actions will:

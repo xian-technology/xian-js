@@ -338,6 +338,7 @@ function writeGithubOutputs(path, context) {
   appendFileSync(
     path,
     [
+      `release_tag=v${context.version}`,
       `source_sha=${context.sourceSha}`,
       `version=${context.version}`,
       `${prefix}_repository=${context.component.repository}`,

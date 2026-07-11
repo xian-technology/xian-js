@@ -4,9 +4,15 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing release tag to publish or backfill, for example v0.2.0"
+        required: true
+        type: string
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -15,6 +21,7 @@ jobs:
     permissions:
       contents: read
     outputs:
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
       source_sha: ${{ steps.resolve.outputs.source_sha }}
       version: ${{ steps.resolve.outputs.version }}
       xian_contracting_repository: ${{ steps.resolve.outputs.xian_contracting_repository }}
@@ -25,7 +32,12 @@ jobs:
         with:
           fetch-depth: 0
           path: xian-js
-          ref: ${{ github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - name: Resolve release tag commit
+        id: release-tag
+        working-directory: xian-js
+        run: echo "commit_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
 
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
@@ -36,9 +48,9 @@ jobs:
         id: resolve
         working-directory: xian-js
         env:
-          GITHUB_REF_TYPE: ${{ github.ref_type }}
-          RELEASE_TAG: ${{ github.ref_name }}
-          TRIGGER_SHA: ${{ github.sha }}
+          GITHUB_REF_TYPE: tag
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          TRIGGER_SHA: ${{ steps.release-tag.outputs.commit_sha }}
         run: node ./scripts/release-context.mjs resolve
 
   build:
@@ -87,7 +99,7 @@ jobs:
         env:
           COMPONENT_CHECKOUT: ${{ github.workspace }}/xian-contracting
           EXPECTED_SOURCE_SHA: ${{ needs.release-context.outputs.source_sha }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ needs.release-context.outputs.release_tag }}
         run: node ./scripts/release-context.mjs verify-component
 
       - name: Install locked dependencies
@@ -113,7 +125,7 @@ jobs:
       - name: Verify release artifact metadata
         env:
           ARTIFACT_DIRECTORY: release-dist
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ needs.release-context.outputs.release_tag }}
         run: node ./scripts/release-context.mjs verify-artifacts
 
       - name: Upload validated release artifacts
@@ -130,6 +142,7 @@ jobs:
       - build
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       id-token: write
     outputs:
       web_kit_published: ${{ steps.publish.outputs.web_kit_published }}
@@ -228,12 +241,13 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-context.outputs.release_tag }}
           RELEASE_VERSION: ${{ needs.release-context.outputs.version }}
           WEB_KIT_PUBLISHED: ${{ needs.publish.outputs.web_kit_published }}
         run: |
           release_flags=()
           release_notes=()
-          if [[ "${GITHUB_REF_NAME}" == *"-"* ]]; then
+          if [[ "${RELEASE_TAG}" == *"-"* ]]; then
             release_flags+=(--prerelease)
           fi
           if [[ "${WEB_KIT_PUBLISHED}" != "true" ]]; then
@@ -242,10 +256,16 @@ jobs:
               $'NPM publish status:\n\n- Published to npm: `@xian-tech/client`, `@xian-tech/provider`, and `@xian-tech/types`.\n- Attached as a validated release artifact: `@xian-tech/web-kit`. npm publish for this package is blocked by npm package trusted-publisher/token permissions.\n'
             )
           fi
-          gh release create "${GITHUB_REF_NAME}" release-dist/* \
-            --repo "${GITHUB_REPOSITORY}" \
-            --verify-tag \
-            --title "xian-js ${RELEASE_VERSION}" \
-            --generate-notes \
-            "${release_notes[@]}" \
-            "${release_flags[@]}"
+          if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" release-dist/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --clobber
+          else
+            gh release create "${RELEASE_TAG}" release-dist/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --verify-tag \
+              --title "xian-js ${RELEASE_VERSION}" \
+              --generate-notes \
+              "${release_notes[@]}" \
+              "${release_flags[@]}"
+          fi
