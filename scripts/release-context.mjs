@@ -369,7 +369,7 @@ function main() {
     const context = resolveReleaseContext(root, {
       tag: requiredEnv("RELEASE_TAG"),
       triggerSha: requiredEnv("TRIGGER_SHA"),
-      refType: requiredEnv("GITHUB_REF_TYPE"),
+      refType: process.env.RELEASE_REF_TYPE || requiredEnv("GITHUB_REF_TYPE"),
     });
     writeGithubOutputs(requiredEnv("GITHUB_OUTPUT"), context);
     return;

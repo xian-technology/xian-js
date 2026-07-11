@@ -48,7 +48,7 @@ jobs:
         id: resolve
         working-directory: xian-js
         env:
-          GITHUB_REF_TYPE: tag
+          RELEASE_REF_TYPE: tag
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
           TRIGGER_SHA: ${{ steps.release-tag.outputs.commit_sha }}
         run: node ./scripts/release-context.mjs resolve
