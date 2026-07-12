@@ -3,7 +3,8 @@
 ## Scope
 - `xian-js` is the JS / TS SDK workspace for browser apps, wallets, dapps, and
   Node.js consumers that want official Xian integration packages.
-- Keep the repo focused on the public client and provider surface.
+- Keep the repo focused on public client, provider, and deterministic protocol
+  integration surfaces.
 - Do not mix backend-operator helpers or Python-specific projection patterns
   into the core browser path.
 - Browser wallet product code lives in the sibling `../xian-wallet-browser`
@@ -14,6 +15,8 @@
   and websocket subscriptions.
 - `packages/provider/`: provider request / event contract and a simple provider
   implementation for tests and reference integrations.
+- `packages/dex/`: dependency-free DEX route, quote, slippage, deadline, and
+  transaction-call planning.
 - `docs/ARCHITECTURE.md`: package ownership and dependency direction.
 - `docs/BACKLOG.md`: future work and links to deeper notes.
 

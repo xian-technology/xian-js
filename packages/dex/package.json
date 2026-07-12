@@ -1,0 +1,52 @@
+{
+  "name": "@xian-tech/dex",
+  "version": "0.3.0",
+  "description": "Deterministic Xian DEX quoting and transaction planning",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xian-technology/xian-js.git",
+    "directory": "packages/dex"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./routing": {
+      "types": "./dist/routing.d.ts",
+      "import": "./dist/routing.js",
+      "default": "./dist/routing.js"
+    },
+    "./constant-product": {
+      "types": "./dist/constant-product.d.ts",
+      "import": "./dist/constant-product.js",
+      "default": "./dist/constant-product.js"
+    },
+    "./execution": {
+      "types": "./dist/execution.d.ts",
+      "import": "./dist/execution.js",
+      "default": "./dist/execution.js"
+    },
+    "./adapters/xian-v1": {
+      "types": "./dist/adapters/xian-v1.d.ts",
+      "import": "./dist/adapters/xian-v1.js",
+      "default": "./dist/adapters/xian-v1.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

@@ -125,6 +125,7 @@ jobs:
           mkdir -p release-dist
           npm pack --workspace @xian-tech/types --pack-destination release-dist
           npm pack --workspace @xian-tech/client --pack-destination release-dist
+          npm pack --workspace @xian-tech/dex --pack-destination release-dist
           npm pack --workspace @xian-tech/provider --pack-destination release-dist
           npm pack --workspace @xian-tech/web-kit --pack-destination release-dist
 
@@ -175,8 +176,8 @@ jobs:
           shopt -s nullglob
           web_kit_published=true
           packages=(release-dist/*.tgz)
-          if [ "${#packages[@]}" -ne 4 ]; then
-            echo "Expected four npm artifacts, found ${#packages[@]}" >&2
+          if [ "${#packages[@]}" -ne 5 ]; then
+            echo "Expected five npm artifacts, found ${#packages[@]}" >&2
             exit 1
           fi
 
@@ -188,7 +189,7 @@ jobs:
             name="${metadata%%$'\t'*}"
             version="${metadata#*$'\t'}"
             case "${name}" in
-              @xian-tech/types|@xian-tech/client|@xian-tech/provider|@xian-tech/web-kit) ;;
+              @xian-tech/types|@xian-tech/client|@xian-tech/dex|@xian-tech/provider|@xian-tech/web-kit) ;;
               *) echo "Unexpected package: ${name}" >&2; exit 1 ;;
             esac
             if [ "${version}" != "${EXPECTED_VERSION}" ]; then
@@ -259,7 +260,7 @@ jobs:
           if [[ "${WEB_KIT_PUBLISHED}" != "true" ]]; then
             release_notes+=(
               --notes
-              $'NPM publish status:\n\n- Published to npm: `@xian-tech/client`, `@xian-tech/provider`, and `@xian-tech/types`.\n- Attached as a validated release artifact: `@xian-tech/web-kit`. npm publish for this package is blocked by npm package trusted-publisher/token permissions.\n'
+              $'NPM publish status:\n\n- Published to npm: `@xian-tech/client`, `@xian-tech/dex`, `@xian-tech/provider`, and `@xian-tech/types`.\n- Attached as a validated release artifact: `@xian-tech/web-kit`. npm publish for this package is blocked by npm package trusted-publisher/token permissions.\n'
             )
           fi
           if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then

@@ -6,6 +6,8 @@ Current packages:
 
 - `client/`: typed RPC client, tx helpers, Ed25519 signer, and websocket
   subscriptions (`@xian-tech/client`)
+- `dex/`: protocol-neutral exact-in routing, constant-product math, and named
+  transaction-call adapters (`@xian-tech/dex`)
 - `provider/`: browser provider contract, injected-wallet discovery, and a
   simple in-memory provider (`@xian-tech/provider`)
 - `types/`: shared transaction, signer, number, and broadcast-mode types
@@ -17,6 +19,8 @@ Current packages:
 Dependency direction:
 
 - `types/` has no workspace dependencies
+- `dex/` has no workspace dependencies and performs no network or wallet I/O;
+  future DEXes add adapters without duplicating its routing core
 - `client/` and `provider/` build on `types/`
 - `provider/` may depend on the client contract; `client/` must remain
   provider-agnostic
@@ -25,6 +29,7 @@ Dependency direction:
 ```mermaid
 flowchart LR
   Types["packages/types"] --> Client["packages/client"]
+  Dex["packages/dex"] --> Dapp["DEX app or agent"]
   Types --> Provider["packages/provider"]
   Client --> RPC["Xian RPC and websockets"]
   Provider --> Client
