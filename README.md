@@ -3,10 +3,12 @@
 `xian-js` is the JavaScript / TypeScript SDK workspace for integrating Xian
 from browsers, wallets, dapps, and Node.js applications. It owns the typed
 RPC client, the browser wallet provider contract, the injected-wallet
-discovery layer, and runnable integration examples.
+discovery layer, deterministic DEX planning helpers, and runnable integration
+examples.
 
-The repo is a TypeScript monorepo. Packages publish independently under the
-`@xian-tech/*` scope. Browser wallet *product* code lives in the sibling
+The repo is a TypeScript monorepo. Its focused packages are installed
+independently under the `@xian-tech/*` scope and released together under the
+repo-level version policy. Browser wallet *product* code lives in the sibling
 [`xian-wallet-browser`](../xian-wallet-browser) repo; this repo provides the
 SDK and provider primitives that wallet implementations depend on.
 
@@ -15,6 +17,7 @@ SDK and provider primitives that wallet implementations depend on.
 ```mermaid
 flowchart LR
   Dapp["Dapp"] --> Provider["Injected wallet provider"]
+  Dapp --> Dex["@xian-tech/dex planner"]
   Provider --> WalletProduct["Browser wallet product"]
   Dapp --> Client["@xian-tech/client"]
   WalletProduct --> Client
@@ -54,6 +57,34 @@ const tx = await client.buildTx({
 const signedTx = await client.signTx(tx, signer);
 const submission = await client.broadcastTx(signedTx, { mode: "checktx" });
 console.log(submission.txHash);
+```
+
+### DEX Planning
+
+Plan an exact-input DEX swap without coupling route logic to an RPC or wallet:
+
+```ts
+import {
+  deadlineFromNow,
+  planXianDexV1ExactInExecution,
+  selectBestXianDexV1ExactInRoute,
+} from "@xian-tech/dex";
+
+const quote = selectBestXianDexV1ExactInRoute({
+  pairs,
+  fromToken: "currency",
+  toToken: "con_usdc",
+  amountIn: 10,
+});
+if (!quote) throw new Error("No route");
+
+const plan = planXianDexV1ExactInExecution({
+  quote,
+  recipient: agentAddress,
+  allowance,
+  slippageBps: 50,
+  deadline: deadlineFromNow(15),
+});
 ```
 
 ### Wallet-Side Registration
@@ -332,6 +363,8 @@ same flows interactively.
 
 - `packages/client/` — `@xian-tech/client`: typed RPC client, transaction
   builder, Ed25519 signer, websocket subscriptions.
+- `packages/dex/` — `@xian-tech/dex`: deterministic exact-in route quotes,
+  price impact, slippage/deadline, and ordered approval/swap call plans.
 - `packages/provider/` — `@xian-tech/provider`: browser wallet provider
   contract, an in-memory reference implementation, and the injected-wallet
   discovery helpers.

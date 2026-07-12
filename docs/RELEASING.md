@@ -17,7 +17,7 @@ That means:
 
 - the repo tag is `vX.Y.Z`
 - every publishable package in this repo must have version `X.Y.Z`
-- the current publishable packages are `@xian-tech/client`,
+- the current publishable packages are `@xian-tech/client`, `@xian-tech/dex`,
   `@xian-tech/provider`, `@xian-tech/types`, and `@xian-tech/web-kit`
 
 This repo is not lockstepped with `xian-wallet-browser`.
@@ -47,8 +47,9 @@ Release checklist:
 1. Update the root and every publishable package manifest to the intended
    release version:
    `package.json`,
-   `packages/client/package.json`, `packages/provider/package.json`,
-   `packages/types/package.json`, and `packages/web-kit/package.json`.
+   `packages/client/package.json`, `packages/dex/package.json`,
+   `packages/provider/package.json`, `packages/types/package.json`, and
+   `packages/web-kit/package.json`.
 2. Run `npm install` if package metadata changed and commit the resulting
    `package-lock.json` update.
 3. Update `release-manifest.json` to the exact released `xian-contracting`
@@ -76,6 +77,40 @@ package:
 - workflow: `release.yml`
 - environment: `npm`
 
+For `@xian-tech/dex`, configure the npm package's trusted publisher with these
+exact values:
+
+- provider: GitHub Actions
+- organization or user: `xian-technology`
+- repository: `xian-js`
+- workflow filename: `release.yml`
+- environment name: `npm`
+- allowed action: `npm publish`
+
+The workflow filename is only the basename, not `.github/workflows/release.yml`.
+The equivalent npm CLI command, after the package exists, is:
+
+```bash
+npm trust github @xian-tech/dex \
+  --repo xian-technology/xian-js \
+  --file release.yml \
+  --env npm \
+  --allow-publish \
+  --yes
+```
+
+The CLI management command requires npm 11.15 or newer, write access to the
+package, and account-level 2FA. The website form can be used instead.
+
+npm requires a package to exist before a trusted publisher can be attached.
+For a new package, make one authenticated bootstrap publication first. Prefer a
+normal repo prerelease such as `0.3.0-beta.0`: commit the lockstep prerelease
+versions, build from that clean commit, manually publish only the DEX tarball
+with 2FA and the `beta` dist-tag, then attach the trusted publisher before
+pushing the matching repo tag. The tag workflow verifies the same tarball,
+skips the already-published DEX artifact only when integrity matches, and uses
+trusted publishing for later versions.
+
 ## What The Release Workflow Does
 
 On an accepted release tag, GitHub Actions will:
@@ -90,10 +125,10 @@ On an accepted release tag, GitHub Actions will:
 7. publish only the downloaded artifacts to npm with trusted publishing
 8. create a GitHub release from the same tag and artifacts
 
-The npm publish step is fail-closed for `@xian-tech/client`,
+The npm publish step is fail-closed for `@xian-tech/client`, `@xian-tech/dex`,
 `@xian-tech/provider`, and `@xian-tech/types`. A version already on npm is
-skipped only when its registry integrity exactly matches the validated tarball;
-a mismatch fails closed.
+skipped only when its registry integrity exactly matches the validated
+tarball; a mismatch fails closed.
 
 `@xian-tech/web-kit` is still attached to the GitHub release as a validated
 tarball if npm rejects publication because the package-side trusted publisher

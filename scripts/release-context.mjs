@@ -22,6 +22,7 @@ const POLICIES = {
       "xian-js": "package.json",
       "@xian-tech/types": "packages/types/package.json",
       "@xian-tech/client": "packages/client/package.json",
+      "@xian-tech/dex": "packages/dex/package.json",
       "@xian-tech/provider": "packages/provider/package.json",
       "@xian-tech/web-kit": "packages/web-kit/package.json",
     },
@@ -33,6 +34,7 @@ const POLICIES = {
     publishedPackages: [
       "@xian-tech/types",
       "@xian-tech/client",
+      "@xian-tech/dex",
       "@xian-tech/provider",
       "@xian-tech/web-kit",
     ],
