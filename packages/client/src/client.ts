@@ -1,3 +1,4 @@
+import { prepareTransaction, type PreparedTransaction } from "./transaction.js";
 import {
   base64ToUtf8,
   bytesToUtf8,
@@ -1110,7 +1111,7 @@ export class XianClient {
           ? "broadcast_tx_commit"
           : "broadcast_tx_sync";
 
-    const encodedTx = bytesToHex(utf8ToBytes(encodeRuntime(sortKeysDeep(tx))));
+    const encodedTx = prepareTransaction(tx).rpcHex;
     const url = new URL(`${this.rpcUrl}/${endpoint}`);
     url.searchParams.set("tx", `"${encodedTx}"`);
 
@@ -1190,6 +1191,8 @@ export class XianClient {
   async sendTx(
     request: BuildTxRequest & {
       signer: XianSigner;
+      /** Persist submission identity before any broadcast; errors abort submission. */
+      onPreparedTransaction?: (prepared: PreparedTransaction) => Promise<void>;
       mode?: BroadcastMode;
       waitForTx?: boolean;
       timeoutMs?: number;
@@ -1209,6 +1212,7 @@ export class XianClient {
     if (request.nonce != null) {
       const tx = await this.buildTx(request);
       const signedTx = await this.signTx(tx, request.signer);
+      await request.onPreparedTransaction?.(prepareTransaction(signedTx));
       return this.broadcastTx(signedTx, broadcastOptions);
     }
 
@@ -1227,6 +1231,7 @@ export class XianClient {
           nonce: reservation.nonce
         });
         const signedTx = await this.signTx(tx, request.signer);
+        await request.onPreparedTransaction?.(prepareTransaction(signedTx));
         await this.nonceReservations.assertCanBroadcast(reservation);
         broadcastAttempted = true;
         let submission: TransactionSubmission;

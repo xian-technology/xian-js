@@ -42,3 +42,5 @@ export {
 } from "./errors.js";
 export { WatchApi } from "./watch.js";
 export type * from "./types.js";
+
+export { prepareTransaction, type PreparedTransaction } from "./transaction.js";

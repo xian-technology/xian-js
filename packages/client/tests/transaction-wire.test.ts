@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { canonicalizeRuntime, decodeRuntime, sortKeysDeep } from "../src/encoding";
-import { Ed25519Signer, XianClient } from "../src/index";
+import { Ed25519Signer, XianClient, prepareTransaction } from "../src/index";
 
 const vectors = JSON.parse(readFileSync(new URL(
   "../../../../xian-contracting/tests/fixtures/transaction_wire.json", import.meta.url
@@ -50,3 +50,14 @@ describe("shared canonical transaction vectors", () => {
     );
   });
 });
+
+
+for (const receipt of vectors.node_receipts) {
+  it(`matches a real CometBFT receipt: ${receipt.name}`, () => {
+    const rpcHex = Buffer.from(receipt.block_tx_base64, "base64").toString("ascii");
+    const signed = JSON.parse(Buffer.from(rpcHex, "hex").toString("utf8"));
+    const prepared = prepareTransaction(signed);
+    expect(prepared.rpcHex).toBe(rpcHex);
+    expect(prepared.txHash).toBe(receipt.tx_hash);
+  });
+}

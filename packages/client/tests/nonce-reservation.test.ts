@@ -457,3 +457,45 @@ describe("XianClient automatic nonce reservations", () => {
     expect(observed).toContain(`${senderA}:chain-a`);
   });
 });
+
+describe("durable prepared transaction observer", () => {
+  it.each([undefined, 7])("awaits persistence before broadcast (nonce %s)", async (nonce) => {
+    const sender = "a".repeat(64);
+    let persisted = false;
+    let preparedHex = "";
+    const client = new XianClient({ rpcUrl: "http://node", fetchFn: (async (input: string | URL) => {
+      if (String(input).includes("abci_query")) return nonceResponse(7);
+      expect(persisted).toBe(true);
+      expect(JSON.parse(new URL(String(input)).searchParams.get("tx")!)).toBe(preparedHex);
+      return acceptedResponse("hash");
+    }) as typeof fetch });
+    await client.sendTx({ sender, signer: signer(sender), chainId: "chain-a", nonce,
+      contract: "currency", function: "transfer", kwargs: { to: "bob", amount: 1 }, chi: 100,
+      onPreparedTransaction: async (prepared) => {
+        expect(Object.isFrozen(prepared)).toBe(true);
+        expect(prepared.txHash).toMatch(/^[A-F0-9]{64}$/);
+        preparedHex = prepared.rpcHex;
+        await Promise.resolve();
+        persisted = true;
+      }
+    });
+    expect(persisted).toBe(true);
+  });
+
+  it("does not broadcast or consume a nonce when persistence fails", async () => {
+    const sender = "a".repeat(64);
+    const nonces: unknown[] = [];
+    const client = new XianClient({ rpcUrl: "http://node", fetchFn: (async (input: string | URL) => {
+      if (String(input).includes("abci_query")) return nonceResponse(7);
+      nonces.push(decodeBroadcast(input).payload.nonce);
+      return acceptedResponse("hash");
+    }) as typeof fetch });
+    await expect(client.sendTx({ sender, signer: signer(sender), chainId: "chain-a",
+      contract: "currency", function: "transfer", kwargs: { to: "bob", amount: 1 }, chi: 100,
+      onPreparedTransaction: async () => { throw new Error("storage unavailable"); }
+    })).rejects.toThrow("storage unavailable");
+    expect(nonces).toEqual([]);
+    await send(client, sender, signer(sender));
+    expect(nonces).toEqual([7]);
+  });
+});
