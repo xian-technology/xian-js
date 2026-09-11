@@ -156,6 +156,13 @@ function normalizeMaybeBoolean(value: unknown): boolean | null {
 }
 
 function normalizeMaybeRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value === "string") {
+    try {
+      value = decodeRuntime(value);
+    } catch {
+      return null;
+    }
+  }
   return value != null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
@@ -950,7 +957,7 @@ export class XianClient {
       ? value as Record<string, unknown>
       : {};
     return {
-      available: payload.available !== false,
+      available: value != null && payload.available !== false,
       items: normalizeIndexedEvents(payload.items),
       limit: Number(payload.limit ?? limit),
       offset: Number(payload.offset ?? offset)

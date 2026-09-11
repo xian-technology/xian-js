@@ -22,3 +22,8 @@ apps do not re-implement the same wallet/RPC plumbing.
 
 - Keep this package app-agnostic: shared helpers only, no app-specific
   business logic or styling systems.
+
+`maybeDate` interprets offset-free contract timestamps as UTC, including
+microsecond fractions (truncated to JavaScript milliseconds). Explicit timezone
+offsets are honored. This keeps chain timestamps consistent across browser
+timezones.

@@ -20,4 +20,12 @@ describe("@xian-tech/web-kit format helpers", () => {
       maybeDate({ __time__: [2026, 5, 29, 12, 30, 15, 123000] })?.toISOString()
     ).toBe("2026-05-29T12:30:15.123Z");
   });
+
+  it("interprets offset-free contract timestamps as UTC and preserves explicit offsets", () => {
+    expect(maybeDate("2026-09-11 01:50:05.688833")?.toISOString()).toBe("2026-09-11T01:50:05.688Z");
+    expect(maybeDate("2026-09-11T01:50:05")?.toISOString()).toBe("2026-09-11T01:50:05.000Z");
+    expect(maybeDate("2026-09-11T03:50:05+02:00")?.toISOString()).toBe("2026-09-11T01:50:05.000Z");
+    expect(maybeDate("2026-09-11T01:50:05Z")?.toISOString()).toBe("2026-09-11T01:50:05.000Z");
+    expect(maybeDate("not a timestamp")).toBeNull();
+  });
 });

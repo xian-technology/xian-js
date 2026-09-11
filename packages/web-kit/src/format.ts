@@ -67,7 +67,14 @@ export function maybeDate(value: unknown): Date | null {
     }
   }
   if (typeof value === "string" || typeof value === "number") {
-    const date = new Date(value);
+    // Contract Datetime strings omit an offset but represent UTC, like __time__.
+    const utc = typeof value === "string"
+      ? /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?$/.exec(value.trim())
+      : null;
+    const normalized = utc
+      ? `${utc[1]}T${utc[2]}.${(utc[3] ?? "0").slice(0, 3).padEnd(3, "0")}Z`
+      : value;
+    const date = new Date(normalized);
     if (!Number.isNaN(date.getTime())) {
       return date;
     }

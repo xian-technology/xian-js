@@ -75,11 +75,12 @@ export function sortKeysDeep<T>(value: T): T {
     return value;
   }
 
-  const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(value).sort(compareUnicodeCodePoints)) {
-    sorted[key] = sortKeysDeep(value[key]);
-  }
-  return sorted as T;
+  // Define own properties, including __proto__, without invoking setters.
+  return Object.fromEntries(
+    Object.keys(value).sort(compareUnicodeCodePoints).map(
+      (key) => [key, sortKeysDeep(value[key])]
+    )
+  ) as T;
 }
 
 function encodeInt(value: bigint | number): bigint | number | { __big_int__: string } {
@@ -114,18 +115,37 @@ function encodeValue(value: unknown): unknown {
     return value.map((item) => encodeValue(item));
   }
   if (isPlainObject(value)) {
-    const sorted = sortKeysDeep(value);
-    const encoded: Record<string, unknown> = {};
-    for (const [key, entry] of Object.entries(sorted)) {
-      encoded[key] = encodeValue(entry);
-    }
-    return encoded;
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, encodeValue(entry)])
+    );
   }
   return value;
 }
 
+function stringifyCanonical(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    return `[${Array.from(value, (item) => stringifyCanonical(item) ?? "null").join(",")}]`;
+  }
+  if (isPlainObject(value)) {
+    const fields: string[] = [];
+    for (const key of Object.keys(value).sort(compareUnicodeCodePoints)) {
+      const encoded = stringifyCanonical(value[key]);
+      if (encoded !== undefined) {
+        fields.push(`${JSON.stringify(key)}:${encoded}`);
+      }
+    }
+    return `{${fields.join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
 export function encodeRuntime(value: unknown): string {
-  return JSON.stringify(encodeValue(value));
+  // Object enumeration reorders integer-index keys, so emit pairs directly.
+  const encoded = stringifyCanonical(encodeValue(value));
+  if (encoded === undefined) {
+    throw new TypeError("value must be JSON-serializable");
+  }
+  return encoded;
 }
 
 function isDigit(character: string): boolean {
@@ -240,11 +260,9 @@ function decodeValue(value: unknown): unknown {
     return value.__fixed__;
   }
 
-  const decoded: Record<string, unknown> = {};
-  for (const [key, entry] of Object.entries(value)) {
-    decoded[key] = decodeValue(entry);
-  }
-  return decoded;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [key, decodeValue(entry)])
+  );
 }
 
 export function decodeRuntime<T = unknown>(value: string | Uint8Array | null | undefined): T | null {
@@ -260,7 +278,7 @@ export function decodeRuntime<T = unknown>(value: string | Uint8Array | null | u
 }
 
 export function canonicalizeRuntime(value: unknown): string {
-  return encodeRuntime(sortKeysDeep(value));
+  return encodeRuntime(value);
 }
 
 export function parseXianNumber(value: string): number | bigint {

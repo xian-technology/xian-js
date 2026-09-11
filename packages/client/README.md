@@ -42,3 +42,11 @@ Their version-1 payload is length-prefixed and binds the signature to a Xian
 chain ID and account. `signMessage(...)` and `verifyMessage(...)` operate on raw
 UTF-8 bytes and must not be used to implement a wallet's `xian_signMessage`
 request.
+
+Indexed transaction `payload` and event `data` / `dataIndexed` fields are
+normalized to records whether BDS returns objects or JSON text. Large integers
+remain `bigint`; malformed or non-object columns become `null`. The original
+row remains available as `raw`. Event consumers should read both `dataIndexed`
+(indexed identifiers) and `data` (other fields). An absent recent-events index
+returns `available: false`; an available index with no events returns an empty
+list with `available: true`.

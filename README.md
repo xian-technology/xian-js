@@ -227,6 +227,10 @@ const submission = await client.deployContract({
 });
 ```
 
+Transaction signing and broadcast use the same canonical serialization, including
+Unicode and numeric-looking nested keys. Use `bigint` for large integers; runtime
+wrappers are applied recursively through nested arrays and objects.
+
 Nodes compile submitted source and store canonical IR themselves. Client-side
 artifact compilation remains available only as an offline utility.
 
