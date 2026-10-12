@@ -275,7 +275,10 @@ console.log(account, info.capabilities, messageIsValid, signed, sent.txHash);
 `xian_signMessage` uses the version-1 Xian signed-message envelope. The signed
 bytes are length-prefixed and bound to both the active chain and account, so a
 signature cannot be replayed as a raw transaction payload or on another Xian
-chain/account. Dapps should verify wallet signatures with `verifyXianMessage`;
+chain/account. For unenrolled Ed25519 accounts, dapps verify wallet signatures with
+`verifyXianMessage`. Official wallets reject this message-signing method for
+enrolled hybrid accounts; this verifier does not consult their registry state.
+
 `verifyMessage` and `signMessage` are low-level raw Ed25519 primitives retained
 for transaction internals and explicit low-level integrations.
 
@@ -366,7 +369,7 @@ same flows interactively.
 ## Key Directories
 
 - `packages/client/` — `@xian-tech/client`: typed RPC client, transaction
-  builder, Ed25519 signer, websocket subscriptions.
+  builder, Ed25519 and hybrid signers, websocket subscriptions.
 - `packages/dex/` — `@xian-tech/dex`: deterministic exact-in route quotes,
   price impact, slippage/deadline, and ordered approval/swap call plans.
 - `packages/provider/` — `@xian-tech/provider`: browser wallet provider
@@ -401,3 +404,16 @@ npm run test
 - [docs/BACKLOG.md](docs/BACKLOG.md) — open work and follow-ups
 - [docs/RELEASING.md](docs/RELEASING.md) — package release process
 - [../xian-wallet-browser/README.md](../xian-wallet-browser/README.md) — the browser wallet product that consumes these packages
+
+### Hybrid account integration
+
+`HybridAccountSigner`, `MasterAccountTransitionDraft` and `AccountVault` provide
+hybrid account custody. `AccountVault.begin()` creates a single-master draft:
+export one `exportMasterBackup()` file and reopen it with `verifyMasterBackup()`
+before signing. Password encryption is optional. The vault stores only derived
+active credentials and exact pending transactions, never the master/recovery
+secrets. Python uses the same format through `xian_py.account_master`.
+See [the master backup contract](../xian-meta/docs/ACCOUNT_MASTER_BACKUP.md) and
+[wallet recovery guide](../xian-docs-web/concepts/hybrid-account-recovery.md).
+Older role backups remain importable. Enrollment requires explicit node policy
+activation and remains disabled in shipping configurations.

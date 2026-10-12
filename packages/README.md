@@ -4,7 +4,7 @@ This folder contains the publishable `xian-js` workspace packages.
 
 Current packages:
 
-- `client/`: typed RPC client, tx helpers, Ed25519 signer, and websocket
+- `client/`: typed RPC client, tx helpers, Ed25519 and hybrid signers, and websocket
   subscriptions (`@xian-tech/client`)
 - `dex/`: protocol-neutral exact-in routing, constant-product math, and named
   transaction-call adapters (`@xian-tech/dex`)
@@ -20,7 +20,7 @@ Dependency direction:
 
 - `types/` has no workspace dependencies
 - `dex/` has no workspace dependencies and performs no network or wallet I/O;
-  future DEXes add adapters without duplicating its routing core
+  DEX-specific adapters reuse its routing core
 - `client/` and `provider/` build on `types/`
 - `provider/` may depend on the client contract; `client/` must remain
   provider-agnostic

@@ -1,3 +1,4 @@
+import { ed25519 } from "@noble/curves/ed25519.js";
 import nacl from "tweetnacl";
 import {
   XIAN_SIGNED_MESSAGE_VERSION,
@@ -67,11 +68,17 @@ export function verifyMessage(publicKey: string, message: string, signature: str
   }
 
   try {
-    return nacl.sign.detached.verify(
-      utf8ToBytes(message),
-      hexToBytes(signature),
-      hexToBytes(publicKey)
-    );
+    const signatureBytes = hexToBytes(signature);
+    const publicKeyBytes = hexToBytes(publicKey);
+    const messageBytes = utf8ToBytes(message);
+    // Reject small-order R and use strict point/scalar decoding. Keep NaCl's
+    // uncofactored verification equation as well: noble's RFC8032 verifier uses
+    // the cofactored equation, which accepts a broader set of edge cases.
+    if (ed25519.Point.fromBytes(signatureBytes.subarray(0, 32), false).isSmallOrder()) {
+      return false;
+    }
+    return ed25519.verify(signatureBytes, messageBytes, publicKeyBytes, { zip215: false }) &&
+      nacl.sign.detached.verify(messageBytes, signatureBytes, publicKeyBytes);
   } catch {
     return false;
   }

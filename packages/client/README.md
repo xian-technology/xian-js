@@ -50,3 +50,20 @@ row remains available as `raw`. Event consumers should read both `dataIndexed`
 (indexed identifiers) and `data` (other fields). An absent recent-events index
 returns `available: false`; an available index with no events returns an empty
 list with `available: true`.
+
+## Hybrid account custody
+
+`HybridAccountSigner` signs `xian_account_v1` transactions for the original
+account address. `MasterAccountTransitionDraft` requires export and verification
+of one fresh master backup before signing a transition. `AccountVault` persists
+only derived active credentials and pending signed transactions, reconciles
+committed registry state, and rejects fallback to an obsolete signer.
+
+`exportAccountMaster`, `importAccountMaster`, and `accountBackupFromMaster`
+share the portable master format with Python. Master backups belong offline;
+encrypted active-only credentials support everyday signing. The master is per
+account and chain, independent of the original mnemonic.
+
+The external-message helpers above implement Ed25519 message signatures; they
+do not establish current authority for an enrolled hybrid account. See the
+[recovery guide](../../../xian-docs-web/concepts/hybrid-account-recovery.md).

@@ -241,6 +241,10 @@ export class ProviderBackedXianSigner implements XianSigner {
     return account;
   }
 
+  async signTransaction(tx: XianUnsignedTransaction): Promise<XianSignedTransaction> {
+    return this.wallet.signTransaction(tx);
+  }
+
   async signMessage(message: string): Promise<string> {
     let payload: unknown;
     try {
@@ -258,6 +262,7 @@ export class ProviderBackedXianSigner implements XianSigner {
     const signed = await this.wallet.signTransaction({
       payload: payload as XianUnsignedTransaction["payload"]
     });
+    if (!signed.metadata.signature) throw new Error("hybrid transaction authorization is not a message signature");
     return signed.metadata.signature;
   }
 }

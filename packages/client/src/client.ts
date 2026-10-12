@@ -392,7 +392,7 @@ function validatePayload(payload: XianTxPayload): void {
   if (!isHexKey(payload.sender)) {
     throw new TransactionError("sender must be a 32-byte hex public key");
   }
-  if (!isIdentifier(payload.contract)) {
+  if (!isIdentifier(payload.contract) && payload.contract !== "_accounts") {
     throw new TransactionError("contract must be a valid identifier");
   }
   if (!isIdentifier(payload.function)) {
@@ -446,7 +446,7 @@ export class XianClient {
   private async requestJson(
     method: "GET" | "POST",
     url: string,
-    options?: { signal?: AbortSignal; timeoutMs?: number }
+    options?: { signal?: AbortSignal; timeoutMs?: number; body?: string }
   ): Promise<Record<string, unknown>> {
     const timeoutMs = options?.timeoutMs ?? this.requestTimeoutMs;
     const timeoutController =
@@ -464,6 +464,7 @@ export class XianClient {
         method,
         headers: method === "POST" ? { "content-type": "application/json" } : undefined,
         signal,
+        body: options?.body,
       });
     } catch (error) {
       if (callerSignal?.aborted) {
@@ -622,6 +623,15 @@ export class XianClient {
   }
 
   async getStateKey(key: string): Promise<unknown> {
+    if (key.startsWith("_accounts.")) {
+      const data = await this.abciQuery(`/get/${key}`);
+      const value = asRecord(asRecord(data.result).response).value;
+      if (value === EMPTY_ABCI_VALUE) return null;
+      if (typeof value !== "string" || !value.length) throw new AbciError("missing account registry response");
+      const decoded = decodeRuntime(base64ToUtf8(value));
+      if (decoded === null) throw new AbciError("invalid account registry response");
+      return decoded;
+    }
     return this.abciValue(`/get/${key}`);
   }
 
@@ -1083,6 +1093,8 @@ export class XianClient {
       throw new TransactionError("signer address does not match payload sender");
     }
 
+    if (signer.signTransaction) return signer.signTransaction(tx);
+    if (tx.payload.contract === "_accounts") throw new TransactionError("use the verified account transition workflow");
     const signature = await signer.signMessage(canonicalizeRuntime(tx.payload));
     if (!isValidEd25519Signature(signature)) {
       throw new TransactionError("signer returned an invalid Ed25519 signature");
@@ -1115,7 +1127,9 @@ export class XianClient {
     const url = new URL(`${this.rpcUrl}/${endpoint}`);
     url.searchParams.set("tx", `"${encodedTx}"`);
 
-    const data = await this.requestJson("POST", url.toString());
+    const data = tx.metadata.tx_format === "xian_account_v1"
+      ? await this.requestJson("POST", `${this.rpcUrl}/`, { body: JSON.stringify({ jsonrpc: "2.0", id: "xian-account", method: endpoint, params: { tx: btoa(encodedTx) } }) })
+      : await this.requestJson("POST", url.toString());
     const response = asRecord(data.result ?? {});
     const txHash = typeof response.hash === "string" ? response.hash : undefined;
 

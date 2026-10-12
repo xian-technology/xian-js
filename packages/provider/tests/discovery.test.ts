@@ -253,3 +253,13 @@ describe("@xian-tech/provider injected discovery", () => {
     );
   });
 });
+
+it("provider signers forward complete hybrid envelopes", async () => {
+  const { ProviderBackedXianSigner } = await import("../src/discovery.js");
+  const tx = { payload: { sender: "a".repeat(64), chain_id: "local", contract: "currency", function: "transfer", kwargs: {}, nonce: 0, chi_supplied: 1 } };
+  const signed = { ...tx, metadata: { tx_format: "xian_account_v1", auth: { scheme: "ed25519_ml_dsa_65_v1", signature: "hybrid" } } };
+  const wallet = { signTransaction: vi.fn(async () => signed) };
+  const signer = new ProviderBackedXianSigner(wallet as unknown as import("../src/discovery.js").InjectedXianWallet);
+  expect(await signer.signTransaction(tx)).toEqual(signed);
+  await expect(signer.signMessage(JSON.stringify(tx.payload))).rejects.toThrow(/not a message signature/);
+});

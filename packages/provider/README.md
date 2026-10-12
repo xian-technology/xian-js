@@ -70,3 +70,8 @@ flowchart LR
   Request --> Wallet
   Wallet --> Client["@xian-tech/client"]
 ```
+
+The official wallets reject `xian_signMessage` for enrolled hybrid accounts.
+The version-1 message verifier checks Ed25519 only and must not be used as proof
+of current hybrid account authority. Transaction requests continue through the
+wallet's registry-aware signing flow.

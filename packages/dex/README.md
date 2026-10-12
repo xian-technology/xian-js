@@ -85,7 +85,7 @@ custom-ABI example.
   arbitrary precision must validate against on-chain simulation before signing.
 - The generic router handles simple non-split exact-input routes. DEX-specific
   split routing or concentrated-liquidity traversal belongs in an adapter or a
-  future focused module.
+  separate module.
 - New DEX integrations should add adapters, not duplicate the routing core.
 
 ## Validation

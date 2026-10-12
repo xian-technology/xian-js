@@ -5,6 +5,7 @@ export type XianNumber = number | bigint;
 export interface XianSigner {
   getAddress?(): Promise<string> | string;
   signMessage(message: string): Promise<string> | string;
+  signTransaction?(tx: XianUnsignedTransaction): Promise<XianSignedTransaction> | XianSignedTransaction;
 }
 
 export interface XianTxPayload {
@@ -24,7 +25,9 @@ export interface XianUnsignedTransaction {
 export interface XianSignedTransaction {
   payload: XianTxPayload;
   metadata: {
-    signature: string;
+    signature?: string;
+    tx_format?: "xian_account_v1";
+    auth?: { scheme: string; signature: string; active_proof?: string; recovery_proof?: string };
   };
 }
 

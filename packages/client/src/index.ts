@@ -44,3 +44,8 @@ export { WatchApi } from "./watch.js";
 export type * from "./types.js";
 
 export { prepareTransaction, type PreparedTransaction } from "./transaction.js";
+
+export * from "./hybrid.js";
+
+export * from "./account-vault.js";
+export * from "./account-master.js";
