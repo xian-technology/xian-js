@@ -279,6 +279,10 @@ chain/account. Dapps should verify wallet signatures with `verifyXianMessage`;
 `verifyMessage` and `signMessage` are low-level raw Ed25519 primitives retained
 for transaction internals and explicit low-level integrations.
 
+Verification rejects small-order public keys and signature points, noncanonical
+encodings and signature scalars, and signatures that only satisfy a cofactored
+verification equation. Signing and the transaction wire format are unchanged.
+
 For the common dapp path, let the wallet prepare, sign, and broadcast from an
 intent:
 
