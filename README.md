@@ -42,6 +42,7 @@ import { Ed25519Signer, XianClient } from "@xian-tech/client";
 
 const signer = new Ed25519Signer();
 const client = new XianClient({
+  vmProfile: "xian_vm_v2",
   rpcUrl: "http://127.0.0.1:26657",
   dashboardUrl: "http://127.0.0.1:8080",
 });
@@ -153,6 +154,7 @@ import { Ed25519Signer, XianClient } from "@xian-tech/client";
 
 const signer = new Ed25519Signer(process.env.XIAN_PRIVATE_KEY);
 const client = new XianClient({
+  vmProfile: "xian_vm_v2",
   rpcUrl: "http://127.0.0.1:26657",
   dashboardUrl: "http://127.0.0.1:8080",
 });

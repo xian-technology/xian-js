@@ -1,6 +1,7 @@
 import {
   Ed25519Signer,
   XianClient,
+  parseContractJson,
   verifyXianMessage,
   type TransactionSubmission,
   type WatchSubscription,
@@ -27,6 +28,19 @@ interface AppState {
   signedTx?: XianSignedTransaction;
   blockSub?: WatchSubscription;
   balanceSub?: WatchSubscription;
+}
+
+function readContractKwargs(text: string): Record<string, unknown> {
+  const kwargs = parseContractJson(text);
+  if (kwargs === null || typeof kwargs !== "object" || Array.isArray(kwargs)) {
+    throw new Error("Contract kwargs must be a JSON object");
+  }
+  return kwargs as Record<string, unknown>;
+}
+
+function displayJson(value: unknown): string {
+  return JSON.stringify(value, (_key, item) => typeof item === "bigint"
+    ? { __big_int__: item.toString() } : item, 2);
 }
 
 /* ── Mount ─────────────────────────────────────────────────── */
@@ -226,6 +240,7 @@ q<HTMLButtonElement>("#initialize").addEventListener("click", async () => {
     privateKeyInput.value = signer.privateKey;
 
     const client = new XianClient({
+      vmProfile: "xian_vm_v2",
       rpcUrl: rpcUrlInput.value.trim(),
       dashboardUrl: dashboardUrlInput.value.trim() || undefined,
       chainId: chainIdInput.value.trim() || undefined
@@ -310,6 +325,7 @@ q<HTMLButtonElement>("#use-injected-wallet").addEventListener("click", async () 
       state ??
       ({
         client: new XianClient({
+          vmProfile: "xian_vm_v2",
           rpcUrl: rpcUrlInput.value.trim(),
           dashboardUrl: dashboardUrlInput.value.trim() || undefined,
           chainId: chainIdInput.value.trim() || undefined
@@ -366,7 +382,7 @@ q<HTMLButtonElement>("#read-nonce").addEventListener("click", async () => {
     const s = need();
     const address = await addr(s);
     const nonce = await s.client.getNonce(address);
-    readsOutput.textContent = JSON.stringify({ nonce }, null, 2);
+    readsOutput.textContent = displayJson({ nonce });
     log(`nonce ${String(nonce)}`);
   } catch (error) {
     log(fmtError(error));
@@ -378,8 +394,8 @@ q<HTMLButtonElement>("#read-balance").addEventListener("click", async () => {
     const s = need();
     const address = await addr(s);
     const balance = await s.client.getBalance(address);
-    readsOutput.textContent = JSON.stringify({ balance }, null, 2);
-    log(`balance ${JSON.stringify(balance)}`);
+    readsOutput.textContent = displayJson({ balance });
+    log(`balance ${displayJson(balance)}`);
   } catch (error) {
     log(fmtError(error));
   }
@@ -413,16 +429,15 @@ q<HTMLButtonElement>("#sign-message").addEventListener("click", async () => {
 q<HTMLButtonElement>("#build-tx").addEventListener("click", async () => {
   try {
     const s = need();
-    const kwargs = JSON.parse(txKwargsInput.value) as Record<string, unknown>;
-    const parsedChi = Number.parseInt(txChiInput.value, 10);
+    const kwargs = readContractKwargs(txKwargsInput.value);
     s.unsignedTx = await s.wallet.prepareTransaction({
       contract: txContractInput.value.trim(),
       function: txFunctionInput.value.trim(),
       kwargs,
-      chi: Number.isNaN(parsedChi) ? undefined : parsedChi
+      chi: txChiInput.value.trim() || undefined
     });
     s.signedTx = undefined;
-    txOutput.textContent = JSON.stringify(s.unsignedTx, null, 2);
+    txOutput.textContent = displayJson(s.unsignedTx);
     log("prepared unsigned transaction");
   } catch (error) {
     log(fmtError(error));
@@ -436,7 +451,7 @@ q<HTMLButtonElement>("#sign-tx").addEventListener("click", async () => {
       throw new Error("prepare a transaction first");
     }
     s.signedTx = await s.wallet.signTransaction(s.unsignedTx);
-    txOutput.textContent = JSON.stringify(s.signedTx, null, 2);
+    txOutput.textContent = displayJson(s.signedTx);
     log("signed transaction");
   } catch (error) {
     log(fmtError(error));
@@ -453,7 +468,7 @@ q<HTMLButtonElement>("#send-tx").addEventListener("click", async () => {
       mode: txModeSelect.value as "async" | "checktx" | "commit",
       waitForTx: txModeSelect.value !== "async"
     })) as TransactionSubmission;
-    txOutput.textContent = JSON.stringify(submission, null, 2);
+    txOutput.textContent = displayJson(submission);
     log(`sent transaction ${submission.txHash ?? "(no hash)"}`);
   } catch (error) {
     log(fmtError(error));
@@ -463,21 +478,20 @@ q<HTMLButtonElement>("#send-tx").addEventListener("click", async () => {
 q<HTMLButtonElement>("#send-call").addEventListener("click", async () => {
   try {
     const s = need();
-    const kwargs = JSON.parse(txKwargsInput.value) as Record<string, unknown>;
-    const parsedChi = Number.parseInt(txChiInput.value, 10);
+    const kwargs = readContractKwargs(txKwargsInput.value);
     const submission = await s.wallet.sendCall(
       {
         contract: txContractInput.value.trim(),
         function: txFunctionInput.value.trim(),
         kwargs,
-        chi: Number.isNaN(parsedChi) ? undefined : parsedChi
+        chi: txChiInput.value.trim() || undefined
       },
       {
         mode: txModeSelect.value as "async" | "checktx" | "commit",
         waitForTx: txModeSelect.value !== "async"
       }
     );
-    txOutput.textContent = JSON.stringify(submission, null, 2);
+    txOutput.textContent = displayJson(submission);
     log(`sent intent-based call ${submission.txHash ?? "(no hash)"}`);
   } catch (error) {
     log(fmtError(error));
@@ -507,7 +521,7 @@ q<HTMLButtonElement>("#watch-balance").addEventListener("click", async () => {
     s.balanceSub = s.client.watch.state(
       `currency.balances:${address}`,
       (message) => {
-        log(`balance update ${message.key} => ${JSON.stringify(message.value)}`);
+        log(`balance update ${message.key} => ${displayJson(message.value)}`);
       }
     );
     log("watching balance state");
