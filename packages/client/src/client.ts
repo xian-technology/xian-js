@@ -1,5 +1,5 @@
 import { fetchResponse, readJsonResponse, withRequestDeadline } from "./transport.js";
-import { BROADCAST_ENDPOINTS, parseBroadcastResponse } from "./broadcast.js";
+import { BROADCAST_ENDPOINTS, duplicateTxMessage, parseBroadcastResponse } from "./broadcast.js";
 import { asRecord, readErrorMessage } from "./rpc-response.js";
 import { DEFAULT_VM_PROFILE, fixed, parseInteger, type XianVmProfile } from "./numeric.js";
 import { prepareTransaction, type PreparedTransaction } from "./transaction.js";
@@ -21,6 +21,7 @@ import { isValidEd25519Signature } from "./ed25519.js";
 import { AbciError, RpcError, SimulationError, TransactionError, TransportError, TxTimeoutError } from "./errors.js";
 import { NonceReservationManager } from "./nonce-reservation.js";
 import { WatchApi } from "./watch.js";
+import { resolveChiHeadroom, suggestChiSupplied, type ChiHeadroomOptions } from "./chi.js";
 import type {
   BroadcastMode,
   BroadcastTxOptions,
@@ -376,6 +377,7 @@ export class XianClient {
   private readonly fetchFn: typeof fetch;
   private readonly requestTimeoutMs: number;
   private readonly nonceReservations = new NonceReservationManager();
+  private readonly chiHeadroom: Required<ChiHeadroomOptions>;
   private chainIdCache?: string;
 
   constructor(options: XianClientOptions) {
@@ -388,6 +390,7 @@ export class XianClient {
       ? stripTrailingSlash(options.dashboardUrl)
       : undefined;
     this.chainIdCache = options.chainId;
+    this.chiHeadroom = resolveChiHeadroom(options);
     this.fetchFn = options.fetchFn ?? globalThis.fetch.bind(globalThis);
     this.requestTimeoutMs =
       options.requestTimeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -983,12 +986,17 @@ export class XianClient {
     return simulation.result;
   }
 
-  async estimateChi(request: SimulateRequest): Promise<EstimateChiResult> {
+  async estimateChi(
+    request: SimulateRequest,
+    options: ChiHeadroomOptions = {}
+  ): Promise<EstimateChiResult> {
+    const headroom = resolveChiHeadroom(options, this.chiHeadroom);
     const simulation = await this.simulate(request);
     const estimated = coerceChiEstimate(simulation.chi_used);
 
     return {
       estimated,
+      suggested: suggestChiSupplied(estimated, headroom),
       simulation
     };
   }
@@ -999,13 +1007,16 @@ export class XianClient {
     let chiSupplied = request.chiSupplied ?? request.chi;
 
     if (chiSupplied == null) {
-      const estimate = await this.estimateChi({
-        sender: request.sender,
-        contract: request.contract,
-        function: request.function,
-        kwargs: request.kwargs
-      });
-      chiSupplied = estimate.estimated;
+      const estimate = await this.estimateChi(
+        {
+          sender: request.sender,
+          contract: request.contract,
+          function: request.function,
+          kwargs: request.kwargs
+        },
+        { chiMargin: request.chiMargin, minChiHeadroom: request.minChiHeadroom }
+      );
+      chiSupplied = estimate.suggested;
     }
 
     const payload = sortKeysDeep({
@@ -1053,12 +1064,28 @@ export class XianClient {
       throw new TransactionError("mode must be one of: async, checktx, commit");
     }
 
-    const encodedTx = prepareTransaction(tx, this.vmProfile).rpcHex;
+    const prepared = prepareTransaction(tx, this.vmProfile);
     const url = new URL(`${this.rpcUrl}/${BROADCAST_ENDPOINTS[mode]}`);
-    url.searchParams.set("tx", `"${encodedTx}"`);
+    url.searchParams.set("tx", `"${prepared.rpcHex}"`);
 
     const data = await this.requestJson("POST", url.toString());
-    return this.finalizeBroadcast(parseBroadcastResponse(tx, mode, data), options);
+    const submission = parseBroadcastResponse(tx, mode, data, prepared.txHash);
+    return duplicateTxMessage(data) === undefined
+      ? this.finalizeBroadcast(submission, options)
+      : this.confirmDuplicate(submission, options);
+  }
+
+  /** A duplicate is confirmed only by a receipt for its hash, in every mode. */
+  private async confirmDuplicate(
+    submission: TransactionSubmission,
+    options?: BroadcastTxOptions
+  ): Promise<TransactionSubmission> {
+    if (options?.waitForTx && submission.txHash) {
+      submission.receipt = await this.waitForTx(submission.txHash, options);
+      submission.accepted = true;
+      submission.finalized = true;
+    }
+    return submission;
   }
 
   private async finalizeBroadcast(

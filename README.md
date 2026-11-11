@@ -194,6 +194,14 @@ const submission = await client.token("currency").transfer({
 console.log(submission.txHash, submission.accepted, submission.finalized);
 ```
 
+Automatic chi supplies the simulated estimate plus headroom:
+`estimate + max(ceil(estimate * chiMargin), minChiHeadroom)`, with defaults
+`chiMargin = 0.05` and `minChiHeadroom = 10`. Simulated cost can drift before
+execution, and unused chi is refunded. Override the defaults per client
+(`new XianClient({ rpcUrl, chiMargin, minChiHeadroom })`) or per request; an
+explicit `chi` always wins. `estimateChi(...)` returns both the exact
+`estimated` value and the `suggested` supply. The Python SDK uses the same rule.
+
 Automatic sends reserve nonces per `XianClient`, chain, and sender. Concurrent
 `sendTx(...)` calls (including contract and token convenience helpers) therefore
 run their build, sign, and broadcast lifecycles in nonce order and use distinct
@@ -207,6 +215,11 @@ after broadcast is ambiguous, so the sender is quarantined from further
 automatic sends until `get_next_nonce` proves that the network advanced.
 An async broadcast acknowledgment also blocks further automatic sends until
 admission or finalization is established, because it has no CheckTx result.
+A "tx already exists in cache/mempool" response in any mode is reported as
+`submitted: true, accepted: null` under the local transaction hash and is
+quarantined the same way: the node holds those bytes, but that proves neither
+admission nor execution. With `waitForTx`, a receipt for the hash marks it
+accepted and finalized. The Python SDK reports duplicates identically.
 `NonceReservationError` identifies that state. After independently reconciling
 the transaction, a caller can deliberately clear it with:
 

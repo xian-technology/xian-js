@@ -60,6 +60,7 @@ export interface XianDappPolicy {
   methods: XianAutoApproveMethod[];
   contract?: string;
   function?: string;
+  /** Required positive chi limit; a policy without one never auto-approves. */
   maxChi?: XianNumber | string;
   argumentScope?: XianDappPolicyArgumentScope;
   kwargs?: Record<string, unknown>;
@@ -317,12 +318,14 @@ export function evaluateXianDappPolicy(
   if (policy.function && action.function !== policy.function) {
     return { matched: false, action, reason: "function mismatch" };
   }
-  if (policy.maxChi != null) {
-    const policyChi = normalizeNumber(policy.maxChi);
-    const actionChi = normalizeNumber(action.chi);
-    if (policyChi == null || actionChi == null || actionChi > policyChi) {
-      return { matched: false, action, reason: "chi limit exceeded" };
-    }
+  // A stored policy without a positive limit would approve unbounded fees.
+  const policyChi = normalizeNumber(policy.maxChi);
+  if (policyChi == null || policyChi <= 0n) {
+    return { matched: false, action, reason: "chi limit missing" };
+  }
+  const actionChi = normalizeNumber(action.chi);
+  if (actionChi == null || actionChi > policyChi) {
+    return { matched: false, action, reason: "chi limit exceeded" };
   }
   if (!policyArgumentsMatch(policy, action.kwargs)) {
     return { matched: false, action, reason: "arguments mismatch" };
@@ -351,6 +354,23 @@ export function findMatchingXianDappPolicy(
   };
 }
 
+function policyTarget(action: XianDappAction): { contract: string; fn: string } | null {
+  const contract = action.contract?.trim();
+  const fn = action.function?.trim();
+  // Without a positive chi limit the policy would auto-approve unbounded fees.
+  const chi = normalizeNumber(action.chi);
+  if (!contract || !fn || chi == null || chi <= 0n) {
+    return null;
+  }
+  return { contract, fn };
+}
+
+/**
+ * Build a trusted-dapp policy from an approved request, or null when the
+ * request cannot be scoped. The request's chi becomes the policy's `maxChi`;
+ * a request without a known positive chi yields null so a policy can never
+ * auto-approve unbounded fees.
+ */
 export function createXianDappPolicyForRequest(input: {
   id: string;
   origin: string;
@@ -363,14 +383,11 @@ export function createXianDappPolicyForRequest(input: {
   argumentScope?: XianDappPolicyArgumentScope;
 }): XianDappPolicy | null {
   const action = parseXianDappAction(input.request);
-  if (!action) {
+  const target = action ? policyTarget(action) : null;
+  if (!action || !target) {
     return null;
   }
-  const contract = action.contract?.trim();
-  const fn = action.function?.trim();
-  if (!contract || !fn) {
-    return null;
-  }
+  const { contract, fn } = target;
   const argumentScope = input.argumentScope === "any" ? "any" : "exact";
   return {
     id: input.id,

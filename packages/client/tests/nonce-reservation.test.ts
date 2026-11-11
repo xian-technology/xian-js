@@ -109,6 +109,28 @@ describe("XianClient automatic nonce reservations", () => {
     expect(observed).toEqual([7, 8]);
   });
 
+  it("quarantines the automatic nonce after a duplicate-transaction response", async () => {
+    const sender = "a".repeat(64);
+    let networkNonce = 7;
+    const observed: Array<number | bigint> = [];
+    const client = new XianClient({ rpcUrl: "http://node", fetchFn: (async (input: string | URL) => {
+      if (String(input).includes("abci_query")) return nonceResponse(networkNonce);
+      observed.push(decodeBroadcast(input).payload.nonce);
+      return observed.length === 1
+        ? jsonResponse({ error: { message: "Internal error", data: "tx already exists in cache" } })
+        : acceptedResponse("hash");
+    }) as typeof fetch });
+
+    await expect(send(client, sender, signer(sender))).resolves.toMatchObject({
+      submitted: true, accepted: null, finalized: false, nonce: 7
+    });
+    await expect(send(client, sender, signer(sender))).rejects.toBeInstanceOf(NonceReservationError);
+
+    networkNonce = 8;
+    await expect(send(client, sender, signer(sender))).resolves.toMatchObject({ nonce: 8 });
+    expect(observed).toEqual([7, 8]);
+  });
+
   it.each([0, 1])("advances after an async transaction finalizes with code %s", async (code) => {
     const sender = "a".repeat(64);
     const observed: Array<number | bigint> = [];

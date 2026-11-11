@@ -151,4 +151,33 @@ describe("broadcast response and finality behavior", () => {
       await expect(client.broadcastTx(tx, { mode: "commit" })).rejects.toBeInstanceOf(TransportError);
     }
   );
+  describe("duplicate transactions", () => {
+    const localHash = prepareTransaction(tx).txHash;
+    const duplicates = [
+      ["checktx", { result: { code: 19, log: "tx already exists in cache" } }],
+      ["async", { error: { code: -32603, message: "Internal error", data: "tx already exists in mempool" } }],
+      ["checktx", { error: { message: "tx already exists in cache" } }],
+      ["commit", { result: { check_tx: { code: 19, log: "tx already exists in cache" }, height: "0" } }]
+    ] as const;
+
+    it.each(duplicates)("reports a %s duplicate as unresolved under the local hash: %j", async (mode, data) => {
+      const { client } = clientFor(data);
+      const wait = vi.spyOn(client, "waitForTx");
+      const submission = await client.broadcastTx(tx, { mode });
+      expect(submission).toMatchObject({ submitted: true, accepted: null, finalized: false, txHash: localHash });
+      expect(String(submission.message)).toMatch(/already exists/);
+      expect(wait).not.toHaveBeenCalled();
+    });
+
+    it.each(duplicates)("confirms a %s duplicate only by its receipt: %j", async (mode, data) => {
+      const { client } = clientFor(data);
+      const receipt: TransactionReceipt = { success: true, txHash: localHash, response: { result: {} } };
+      const wait = vi.spyOn(client, "waitForTx").mockResolvedValue(receipt);
+      const options = { mode, waitForTx: true, timeoutMs: 50, pollIntervalMs: 1 };
+      await expect(client.broadcastTx(tx, options)).resolves.toMatchObject({
+        submitted: true, accepted: true, finalized: true, txHash: localHash, receipt
+      });
+      expect(wait).toHaveBeenCalledWith(localHash, options);
+    });
+  });
 });

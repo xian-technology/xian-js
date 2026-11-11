@@ -269,6 +269,7 @@ describe("@xian-tech/provider permissions", () => {
       methods: ["xian_sendCall" as const],
       contract: "currency",
       function: "transfer",
+      maxChi: 500,
       createdAt: 1_000
     };
 
@@ -302,4 +303,68 @@ describe("@xian-tech/provider permissions", () => {
       policy: expect.objectContaining({ id: "policy-2" })
     });
   });
+  it.each([undefined, null, 0, -1, 1.5, "abc", "", "0"])(
+    "refuses to create a policy without a known positive chi limit: %j",
+    (chi) => {
+      const intent: Record<string, unknown> = {
+        contract: "currency",
+        function: "transfer",
+        kwargs: { to: "bob", amount: "5" }
+      };
+      if (chi !== undefined) intent.chi = chi;
+      expect(
+        createXianDappPolicyForRequest({
+          id: "policy-unbounded",
+          ...context,
+          request: { method: "xian_sendCall", params: [{ intent }] }
+        })
+      ).toBeNull();
+      expect(
+        createXianDappPolicyForRequest({
+          id: "policy-unbounded-tx",
+          ...context,
+          request: {
+            method: "xian_sendTransaction",
+            params: [{ tx: { payload: { ...intent, chi: undefined, chi_supplied: chi, sender: "alice" } } }]
+          }
+        })
+      ).toBeNull();
+    }
+  );
+
+  it("records the request chi as the policy limit, including large integers", () => {
+    const policy = createXianDappPolicyForRequest({
+      id: "policy-big",
+      ...context,
+      request: {
+        method: "xian_sendCall",
+        params: [{ intent: { contract: "currency", function: "transfer", kwargs: {}, chi: "9007199254740993" } }]
+      }
+    });
+    expect(policy?.maxChi).toBe("9007199254740993");
+  });
+  it.each([undefined, null, 0, -1, 1.5, "abc", "", "0"])(
+    "refuses to auto-approve a stored policy without a valid positive maxChi: %j",
+    (maxChi) => {
+      const policy = {
+        id: "stored",
+        ...context,
+        methods: ["xian_sendCall" as const],
+        contract: "currency",
+        function: "transfer",
+        argumentScope: "any" as const,
+        createdAt: 1_000,
+        ...(maxChi === undefined ? {} : { maxChi: maxChi as unknown as number })
+      };
+      const request = {
+        method: "xian_sendCall",
+        params: [{ intent: { contract: "currency", function: "transfer", kwargs: {}, chi: 1 } }]
+      };
+      expect(evaluateXianDappPolicy(policy, context, request)).toMatchObject({
+        matched: false,
+        reason: "chi limit missing"
+      });
+      expect(findMatchingXianDappPolicy([policy], context, request).matched).toBe(false);
+    }
+  );
 });
