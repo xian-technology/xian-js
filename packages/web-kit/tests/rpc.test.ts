@@ -42,6 +42,50 @@ describe("@xian-tech/web-kit RPC store", () => {
     ]);
   });
 
+  it.each([undefined, "rpc"])("keeps endpoint selection in memory without storage (key=%s)", (storageKey) => {
+    vi.stubGlobal("localStorage", undefined);
+    try {
+      const listener = vi.fn();
+      const store = createXianRpcStore({
+        defaultRpcUrl: "http://127.0.0.1:26657",
+        storageKey,
+        createClient: (url) => ({ url })
+      });
+      const original = store.getClient();
+      store.subscribeRpcEpoch(listener);
+      store.setRpcUrl(" http://127.0.0.1:27657/// ");
+      const selected = store.getClient();
+      expect(store.getRpcUrl()).toBe("http://127.0.0.1:27657");
+      expect(selected).toEqual({ url: "http://127.0.0.1:27657" });
+      expect(selected).not.toBe(original);
+      store.setRpcUrl("http://127.0.0.1:27657/");
+      expect(store.getClient()).toBe(selected);
+      expect(store.getRpcEpoch()).toBe(1);
+      expect(listener).toHaveBeenCalledExactlyOnceWith(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not access browser storage when persistence is not configured", () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      get() { throw new DOMException("Storage access denied", "SecurityError"); }
+    });
+    try {
+      const store = createXianRpcStore({
+        defaultRpcUrl: "http://127.0.0.1:26657",
+        createClient: (url) => ({ url })
+      });
+      store.setRpcUrl("http://127.0.0.1:27657");
+      expect(store.getClient()).toEqual({ url: "http://127.0.0.1:27657" });
+    } finally {
+      if (original) Object.defineProperty(globalThis, "localStorage", original);
+      else Reflect.deleteProperty(globalThis, "localStorage");
+    }
+  });
+
   it("pings the cleaned status URL", async () => {
     const fetchFn = vi.fn(async () => new Response("ok", { status: 200 }));
     const store = createXianRpcStore({

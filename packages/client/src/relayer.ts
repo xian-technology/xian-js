@@ -1,4 +1,5 @@
-import { mergeAbortSignals } from "./client.js";
+import { asRecord } from "./rpc-response.js";
+import { fetchResponse, readJsonResponse, withRequestDeadline } from "./transport.js";
 import {
   normalizeMaybeInteger,
   normalizeMaybeString,
@@ -41,13 +42,6 @@ function jsonBody(value: Record<string, unknown>): string {
   return JSON.stringify(value, (_key, entry) =>
     typeof entry === "bigint" ? entry.toString() : entry
   );
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  if (typeof value !== "object" || value === null) {
-    throw new TransportError("expected object response");
-  }
-  return value as Record<string, unknown>;
 }
 
 function asArrayOfStrings(value: unknown): string[] {
@@ -270,8 +264,7 @@ export class XianShieldedRelayerClient {
   private async requestJson(
     method: "GET" | "POST",
     path: string,
-    body?: Record<string, unknown>,
-    options?: { signal?: AbortSignal; timeoutMs?: number }
+    body?: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
     const headers: Record<string, string> = {
       accept: "application/json"
@@ -285,60 +278,22 @@ export class XianShieldedRelayerClient {
       headers.authorization = `Bearer ${this.authToken}`;
     }
 
-    const timeoutMs = options?.timeoutMs ?? this.requestTimeoutMs;
-    const timeoutController =
-      timeoutMs > 0 ? new AbortController() : undefined;
-    const timeoutHandle = timeoutController
-      ? setTimeout(() => timeoutController.abort(), timeoutMs)
-      : undefined;
-    const signal = mergeAbortSignals(
-      options?.signal,
-      timeoutController?.signal
-    );
-
-    let response: Response;
-    try {
-      response = await this.fetchFn(`${this.relayerUrl}${path}`, {
-        method,
-        headers,
-        body: payload,
-        signal
+    const url = `${this.relayerUrl}${path}`;
+    return withRequestDeadline(async (signal) => {
+      const response = await fetchResponse(this.fetchFn, url, {
+        method, headers, body: payload, signal
       });
-    } catch (error) {
-      if (options?.signal?.aborted) {
-        throw error;
+      const record = await readJsonResponse(response, url, signal);
+      if (!response.ok) {
+        const message = normalizeMaybeString(record.error) ?? `relayer request failed with status ${response.status}`;
+        throw new TransportError(message);
       }
-      if (timeoutController?.signal.aborted) {
-        throw new TransportError(
-          `relayer request timed out after ${timeoutMs}ms for ${this.relayerUrl}${path}`,
-          { cause: error }
-        );
-      }
-      throw new TransportError(
-        `request failed for ${this.relayerUrl}${path}`,
-        { cause: error }
-      );
-    } finally {
-      if (timeoutHandle !== undefined) {
-        clearTimeout(timeoutHandle);
-      }
-    }
-
-    let decoded: unknown;
-    try {
-      decoded = await response.json();
-    } catch (error) {
-      throw new TransportError(
-        `invalid JSON response from ${this.relayerUrl}${path}`,
-        { cause: error }
-      );
-    }
-    const record = asRecord(decoded);
-    if (!response.ok) {
-      const message = normalizeMaybeString(record.error) ?? `relayer request failed with status ${response.status}`;
-      throw new TransportError(message);
-    }
-    return record;
+      return record;
+    }, {
+      timeoutMs: this.requestTimeoutMs,
+      url,
+      label: "relayer request"
+    });
   }
 
   async getInfo(): Promise<XianShieldedRelayerInfo> {

@@ -23,6 +23,11 @@ apps do not re-implement the same wallet/RPC plumbing.
 - Keep this package app-agnostic: shared helpers only, no app-specific
   business logic or styling systems.
 
+`createXianRpcStore` keeps the selected endpoint in memory. Set `storageKey`
+to persist it in the supplied storage adapter or available browser localStorage.
+Memory-only stores do not access browser storage. Endpoint changes replace the
+cached client and notify epoch subscribers once per changed URL.
+
 `maybeDate` interprets offset-free contract timestamps as UTC, including
 microsecond fractions (truncated to JavaScript milliseconds). Explicit timezone
 offsets are honored. This keeps chain timestamps consistent across browser

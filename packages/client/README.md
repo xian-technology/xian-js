@@ -38,6 +38,12 @@ or wait timeout blocks further automatic sends until
 the network nonce advances or the caller deliberately invokes
 `resetNonceReservation(...)` after independent reconciliation.
 
+`requestTimeoutMs` covers response headers and JSON body consumption for both
+RPC and relayer requests. A zero or negative value disables the deadline.
+Per-call query options can override it or supply an abort signal; caller
+cancellation preserves its original reason. Request completion releases timers
+and fallback abort listeners.
+
 Use `signXianMessage(...)` and `verifyXianMessage(...)` for external messages.
 Their version-1 payload is length-prefixed and binds the signature to a Xian
 chain ID and account. `signMessage(...)` and `verifyMessage(...)` operate on raw

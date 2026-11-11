@@ -1,3 +1,4 @@
+import { fetchResponse, readJsonResponse, withRequestDeadline } from "./transport.js";
 import { BROADCAST_ENDPOINTS, parseBroadcastResponse } from "./broadcast.js";
 import { asRecord, readErrorMessage } from "./rpc-response.js";
 import { DEFAULT_VM_PROFILE, fixed, parseInteger, type XianVmProfile } from "./numeric.js";
@@ -56,6 +57,8 @@ import type {
   XianTxPayload,
   XianUnsignedTransaction
 } from "./types.js";
+
+export { mergeAbortSignals } from "./transport.js";
 
 const EMPTY_ABCI_VALUE = "AA==";
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -329,41 +332,6 @@ function isPendingLookupReceipt(receipt: TransactionReceipt): boolean {
   return !receipt.success && receipt.txHash == null && receipt.transaction == null;
 }
 
-/**
- * Combine a caller-provided AbortSignal with a timeout-backed internal
- * signal so either one triggering aborts the underlying fetch. We prefer
- * AbortSignal.any when available; on older runtimes we stitch them
- * together manually.
- */
-export function mergeAbortSignals(
-  a: AbortSignal | undefined,
-  b: AbortSignal | undefined
-): AbortSignal | undefined {
-  if (!a) return b;
-  if (!b) return a;
-  const anyFn = (AbortSignal as unknown as {
-    any?: (signals: AbortSignal[]) => AbortSignal;
-  }).any;
-  if (typeof anyFn === "function") {
-    return anyFn([a, b]);
-  }
-  const controller = new AbortController();
-  const forward = (signal: AbortSignal) => {
-    if (signal.aborted) {
-      controller.abort(signal.reason);
-      return;
-    }
-    signal.addEventListener(
-      "abort",
-      () => controller.abort(signal.reason),
-      { once: true }
-    );
-  };
-  forward(a);
-  forward(b);
-  return controller.signal;
-}
-
 function validatePayload(payload: XianTxPayload): void {
   const keys = Object.keys(payload).sort();
   const expected = ["chain_id", "chi_supplied", "contract", "function", "kwargs", "nonce", "sender"];
@@ -434,49 +402,22 @@ export class XianClient {
     url: string,
     options?: { signal?: AbortSignal; timeoutMs?: number }
   ): Promise<Record<string, unknown>> {
-    const timeoutMs = options?.timeoutMs ?? this.requestTimeoutMs;
-    const timeoutController =
-      timeoutMs > 0 ? new AbortController() : undefined;
-    const timeoutHandle = timeoutController
-      ? setTimeout(() => timeoutController.abort(), timeoutMs)
-      : undefined;
-
-    const callerSignal = options?.signal;
-    const signal = mergeAbortSignals(callerSignal, timeoutController?.signal);
-
-    let response: Response;
-    try {
-      response = await this.fetchFn(url, {
+    return withRequestDeadline(async (signal) => {
+      const response = await fetchResponse(this.fetchFn, url, {
         method,
         headers: method === "POST" ? { "content-type": "application/json" } : undefined,
-        signal,
+        signal
       });
-    } catch (error) {
-      if (callerSignal?.aborted) {
-        throw error;
+      if (!response.ok) {
+        throw new TransportError(`${method} ${url} returned ${response.status}`);
       }
-      if (timeoutController?.signal.aborted) {
-        throw new TransportError(
-          `request timed out after ${timeoutMs}ms for ${url}`,
-          { cause: error }
-        );
-      }
-      throw new TransportError(`request failed for ${url}`, { cause: error });
-    } finally {
-      if (timeoutHandle !== undefined) {
-        clearTimeout(timeoutHandle);
-      }
-    }
-
-    if (!response.ok) {
-      throw new TransportError(`${method} ${url} returned ${response.status}`);
-    }
-
-    try {
-      return asRecord(await response.json());
-    } catch (error) {
-      throw new TransportError(`invalid JSON response from ${url}`, { cause: error });
-    }
+      return readJsonResponse(response, url, signal);
+    }, {
+      timeoutMs: options?.timeoutMs ?? this.requestTimeoutMs,
+      signal: options?.signal,
+      url,
+      label: "request"
+    });
   }
 
   async abciQuery(
