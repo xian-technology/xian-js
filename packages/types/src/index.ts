@@ -33,3 +33,5 @@ export {
   createXianMessageSigningPayload,
   type XianSignedMessageInput
 } from "./message-signing.js";
+
+export { fixed } from "./fixed.js";

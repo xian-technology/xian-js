@@ -1213,3 +1213,62 @@ class FakeSocket implements XianWebSocketLike {
     await Promise.resolve();
   }
 }
+
+it("preserves V2 simulated and persisted decimals through public reads", async () => {
+  const amount = "9007199254740993.123456789012345678901234567891";
+  let captured = "";
+  const client = new XianClient({
+    rpcUrl: "http://localhost", vmProfile: "xian_vm_v2",
+    fetchFn: (async (input: string | URL) => {
+      const path = new URL(String(input)).searchParams.get("path")!;
+      if (path.includes("/simulate_tx/")) {
+        captured = bytesToUtf8(hexToBytes(path.split("/simulate_tx/")[1]!.slice(0,-1)));
+        return jsonResponse({result:{response:{value:btoa(JSON.stringify({status:0,result:{ __fixed__:amount }}))}}});
+      }
+      return jsonResponse({result:{response:{info:"decimal",value:btoa("9007199254740993")}}});
+    }) as typeof fetch,
+  });
+  await expect(client.call({sender:"alice",contract:"token",function:"get",kwargs:{amount:{__fixed__:amount}}})).resolves.toBe(amount);
+  expect(JSON.parse(captured).kwargs.amount).toEqual({__fixed__:amount});
+  await expect(client.getState("token","amount")).resolves.toBe("9007199254740993");
+});
+
+it("reads operator telemetry as ordinary JSON on V2", async () => {
+  const client = new XianClient({
+    rpcUrl: "http://localhost",
+    vmProfile: "xian_vm_v2",
+    fetchFn: async () => jsonResponse({
+      result: { response: { info: "json", value: btoa('{"queue_ratio":0.125}') } }
+    })
+  });
+  await expect(client.getBdsStatus()).resolves.toEqual({ queue_ratio: 0.125 });
+});
+
+it("uses exact storage balance after a contract-level balance_of error", async () => {
+  const balance = "9007199254740993.125";
+  const client = new XianClient({
+    rpcUrl: "http://localhost",
+    vmProfile: "xian_vm_v2",
+    fetchFn: async (input) => {
+      const response = String(input).includes("simulate_tx")
+        ? { value: btoa('{"status":1,"result":"function missing"}') }
+        : { info: "decimal", value: btoa(balance) };
+      return jsonResponse({ result: { response } });
+    }
+  });
+  await expect(client.getBalance("alice")).resolves.toBe(balance);
+});
+
+it("decodes nested V2 contract numbers in a committed receipt", async () => {
+  const amount = "9007199254740993.000000000000000000000000000001";
+  const data = btoa(JSON.stringify({
+    result: [{ __big_int__: "9007199254740993" }, { __fixed__: amount }, "001.2"]
+  }));
+  const client = new XianClient({
+    rpcUrl: "http://localhost",
+    vmProfile: "xian_vm_v2",
+    fetchFn: async () => jsonResponse({ result: { hash: "A", tx_result: { code: 0, data } } })
+  });
+  const receipt = await client.getTx("A");
+  expect(receipt.execution).toEqual({ result: [9007199254740993n, amount, "001.2"] });
+});

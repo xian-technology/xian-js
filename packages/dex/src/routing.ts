@@ -111,9 +111,9 @@ function poolIdentity(id: PoolId): string {
   return `${typeof id}:${String(id)}`;
 }
 
-function buildAdjacency<Pool, Id extends PoolId, HopMetadata>(
+function buildAdjacency<Pool, Id extends PoolId>(
   pools: readonly Pool[],
-  adapter: ExactInRoutingAdapter<Pool, Id, HopMetadata>,
+  adapter: PoolAccess<Pool, Id>,
 ): Map<string, AdjacencyEdge<Pool, Id>[]> {
   const adjacency = new Map<string, AdjacencyEdge<Pool, Id>[]>();
   const seenPoolIds = new Set<string>();
@@ -271,27 +271,33 @@ function quoteCandidate<Pool, Id extends PoolId, HopMetadata>(
   };
 }
 
+type PoolAccess<Pool, Id extends PoolId> = Pick<
+  ExactInRoutingAdapter<Pool, Id>, "poolId" | "tokens" | "comparePoolIds"
+>;
+
+/** Enumerate simple paths independently of the arithmetic used to quote them. */
+export function enumeratePoolPaths<Pool, Id extends PoolId>(
+  pools: readonly Pool[], adapter: PoolAccess<Pool, Id>, fromToken: string,
+  toToken: string, maxHops: number = DEFAULT_MAX_HOPS,
+): CandidateRoute<Pool, Id>[] {
+  assertNonEmpty(fromToken, "fromToken");
+  assertNonEmpty(toToken, "toToken");
+  if (!Number.isInteger(maxHops) || maxHops <= 0) {
+    throw new RangeError("maxHops must be a positive integer");
+  }
+  if (fromToken === toToken) return [];
+  return enumerateCandidates(buildAdjacency(pools, adapter), fromToken, toToken, maxHops,
+    adapter.comparePoolIds ?? defaultComparePoolIds);
+}
+
 /** Enumerate viable simple routes using caller-supplied pool and quote semantics. */
 export function enumerateExactInRoutes<Pool, Id extends PoolId, HopMetadata = unknown>(
   request: ExactInQuoteRequest<Pool, Id, HopMetadata>,
 ): ExactInQuote<Id, HopMetadata>[] {
-  assertNonEmpty(request.fromToken, "fromToken");
-  assertNonEmpty(request.toToken, "toToken");
   assertFinitePositive(request.amountIn, "amountIn");
-  const maxHops = request.maxHops ?? DEFAULT_MAX_HOPS;
-  if (!Number.isInteger(maxHops) || maxHops <= 0) {
-    throw new RangeError("maxHops must be a positive integer");
-  }
-  if (request.fromToken === request.toToken) return [];
-
   const compareIds = request.adapter.comparePoolIds ?? defaultComparePoolIds;
-  const candidates = enumerateCandidates(
-    buildAdjacency(request.pools, request.adapter),
-    request.fromToken,
-    request.toToken,
-    maxHops,
-    compareIds,
-  );
+  const candidates = enumeratePoolPaths(request.pools, request.adapter, request.fromToken,
+    request.toToken, request.maxHops);
   return candidates
     .map((candidate) => quoteCandidate(candidate, request.amountIn, request.adapter))
     .filter((quote): quote is ExactInQuote<Id, HopMetadata> => quote !== null)

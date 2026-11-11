@@ -6,9 +6,11 @@ import {
   createXianMessageSigningPayload,
   decodeRuntime,
   encodeRuntime,
+  fixed,
   isValidEd25519Key,
   isValidEd25519Signature,
   parseXianNumber,
+  parseContractJson,
   signXianMessage,
   verifyMessage,
   verifyXianMessage
@@ -157,4 +159,28 @@ describe("@xian-tech/client encoding", () => {
       '{"kwargs":{"amount":{"__fixed__":"0.5"},"units":{"__big_int__":"1208925819614629174706176"}}}'
     );
   });
+});
+
+describe("exact contract decimal input", () => {
+  it("parses coefficients directly and preserves all 30 fractional places", () => {
+    const amount = "9007199254740993.123456789012345678901234567891";
+    expect(fixed(amount)).toEqual({ __fixed__: amount });
+    for (const bad of ["1.0000000000000001", "1.0", "-0", "9e-400", "9007199254740992"]) {
+      expect(decodeRuntime(`{"nested":[${bad}]}`, "xian_vm_v2")).toBeNull();
+    }
+    expect(fixed("-0e60")).toEqual({ __fixed__: "0" });
+    expect(fixed("+.01000E+2")).toEqual({ __fixed__: "1" });
+    expect(fixed("10e-31")).toEqual({ __fixed__: "0." + "0".repeat(29) + "1" });
+    for (const invalid of ["1e61", "1e-31", "1e10000000", "Inf", " 1", "1_2", "."]) {
+      expect(() => fixed(invalid)).toThrow();
+    }
+  });
+});
+
+it("reads user JSON amounts before host-number coercion", () => {
+  expect(parseContractJson('{"x":[1.00000000000000001,9007199254740993,"1e-3", 2e-30]}')).toEqual({
+    x: [{__fixed__: "1.00000000000000001"}, {__big_int__: "9007199254740993"}, "1e-3", fixed("2e-30")]
+  });
+  for (const input of ["1.", "1e+", "[.5]", "01", "{bad}"]) expect(() => parseContractJson(input)).toThrow(SyntaxError);
+  for (const input of ["1e-31", '{"__fixed__":"01"}', String(1n << 512n)]) expect(() => parseContractJson(input)).toThrow();
 });

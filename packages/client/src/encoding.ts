@@ -1,3 +1,5 @@
+import { checkInteger, checkNumericWrapper, fixed, type XianVmProfile } from "./numeric.js";
+
 const MIN_INT64 = -(2n ** 63n);
 const MAX_INT64 = 2n ** 63n - 1n;
 const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
@@ -95,11 +97,15 @@ function encodeInt(value: bigint | number): bigint | number | { __big_int__: str
   return { __big_int__: normalized.toString() };
 }
 
-function encodeValue(value: unknown): unknown {
+function encodeValue(value: unknown, profile: XianVmProfile): unknown {
   if (typeof value === "bigint") {
+    if (profile === "xian_vm_v2") checkInteger(value);
     return encodeInt(value);
   }
   if (typeof value === "number") {
+    if (profile === "xian_vm_v2" && !Number.isSafeInteger(value)) {
+      throw new TypeError("use bigint for large integers and fixed(text) for decimals");
+    }
     if (!Number.isFinite(value)) {
       throw new TypeError("finite numbers only");
     }
@@ -112,11 +118,12 @@ function encodeValue(value: unknown): unknown {
     return { __bytes__: bytesToHex(value) };
   }
   if (Array.isArray(value)) {
-    return value.map((item) => encodeValue(item));
+    return value.map((item) => encodeValue(item, profile));
   }
   if (isPlainObject(value)) {
+    if (profile === "xian_vm_v2") checkNumericWrapper(value);
     return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, encodeValue(entry)])
+      Object.entries(value).map(([key, entry]) => [key, encodeValue(entry, profile)])
     );
   }
   return value;
@@ -139,117 +146,57 @@ function stringifyCanonical(value: unknown): string | undefined {
   return JSON.stringify(value);
 }
 
-export function encodeRuntime(value: unknown): string {
+export function encodeRuntime(value: unknown, profile: XianVmProfile = "xian_vm_v1"): string {
   // Object enumeration reorders integer-index keys, so emit pairs directly.
-  const encoded = stringifyCanonical(encodeValue(value));
+  const encoded = stringifyCanonical(encodeValue(value, profile));
   if (encoded === undefined) {
     throw new TypeError("value must be JSON-serializable");
   }
   return encoded;
 }
 
-function isDigit(character: string): boolean {
-  return character >= "0" && character <= "9";
-}
+// A full quoted string is one token, so digits inside keys and strings stay untouched.
+const JSON_STRING_OR_NUMBER = /"(?:\\[\s\S]|[^"\\])*"|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
 
-function preserveUnsafeIntegerTokens(text: string): string {
-  let output = "";
-  let index = 0;
-  let inString = false;
-  let escaping = false;
-
-  while (index < text.length) {
-    const character = text.charAt(index);
-
-    if (inString) {
-      output += character;
-      if (escaping) {
-        escaping = false;
-      } else if (character === "\\") {
-        escaping = true;
-      } else if (character === "\"") {
-        inString = false;
-      }
-      index += 1;
-      continue;
-    }
-
-    if (character === "\"") {
-      inString = true;
-      output += character;
-      index += 1;
-      continue;
-    }
-
-    const isNumberStart = character === "-" || isDigit(character);
-    if (!isNumberStart) {
-      output += character;
-      index += 1;
-      continue;
-    }
-
-    const start = index;
-    if (character === "-") {
-      index += 1;
-      if (index >= text.length || !isDigit(text.charAt(index))) {
-        output += character;
-        continue;
-      }
-    }
-
-    if (text.charAt(index) === "0") {
-      index += 1;
-    } else {
-      while (index < text.length && isDigit(text.charAt(index))) {
-        index += 1;
-      }
-    }
-
-    let isPlainInteger = true;
-    if (text.charAt(index) === ".") {
-      isPlainInteger = false;
-      index += 1;
-      while (index < text.length && isDigit(text.charAt(index))) {
-        index += 1;
-      }
-    }
-    if (text.charAt(index) === "e" || text.charAt(index) === "E") {
-      isPlainInteger = false;
-      index += 1;
-      if (text.charAt(index) === "+" || text.charAt(index) === "-") {
-        index += 1;
-      }
-      while (index < text.length && isDigit(text.charAt(index))) {
-        index += 1;
-      }
-    }
-
-    const token = text.slice(start, index);
-    if (isPlainInteger) {
-      try {
-        const parsed = BigInt(token);
-        if (parsed < -MAX_SAFE || parsed > MAX_SAFE) {
-          output += `{"__big_int__":"${token}"}`;
-          continue;
-        }
-      } catch {
-        // Leave invalid JSON number tokens untouched so JSON.parse reports them.
-      }
-    }
-    output += token;
+function numericToken(token: string, mode: XianVmProfile | "source"): string {
+  if (token.startsWith('"')) return token;
+  if (/[.eE]/.test(token)) {
+    if (mode === "source") return JSON.stringify(fixed(token));
+    if (mode === "xian_vm_v2") throw new TypeError("bare decimal in contract data");
+    return token;
   }
-
-  return output;
+  if (mode === "xian_vm_v2" && token === "-0") throw new TypeError("noncanonical integer");
+  if (mode !== "xian_vm_v1" && token.length > 156) throw new RangeError("integer exceeds 512 bits");
+  const integer = BigInt(token);
+  if (integer >= -MAX_SAFE && integer <= MAX_SAFE) return token;
+  if (mode === "xian_vm_v2") throw new RangeError("large bare integer requires __big_int__");
+  return JSON.stringify({ __big_int__: token });
 }
 
-function decodeValue(value: unknown): unknown {
+function parseRuntimeJson(text: string, mode: XianVmProfile | "source"): unknown {
+  // Validate the original source first. The parsed Numbers are discarded.
+  // The replacement keeps exact digits on engines without reviver context.source.
+  JSON.parse(text);
+  return JSON.parse(text.replace(JSON_STRING_OR_NUMBER, (token) => numericToken(token, mode)));
+}
+
+/** Parse contract input JSON from text before JavaScript can round numeric tokens. */
+export function parseContractJson(text: string): unknown {
+  return encodeValue(parseRuntimeJson(text, "source"), "xian_vm_v2");
+}
+
+function decodeValue(value: unknown, profile: XianVmProfile): unknown {
+  if (profile === "xian_vm_v2" && typeof value === "number" && !Number.isSafeInteger(value)) {
+    throw new TypeError("invalid numeric wire value");
+  }
   if (!isPlainObject(value)) {
     if (Array.isArray(value)) {
-      return value.map((item) => decodeValue(item));
+      return value.map((item) => decodeValue(item, profile));
     }
     return value;
   }
 
+  if (profile === "xian_vm_v2") checkNumericWrapper(value);
   if ("__big_int__" in value && typeof value.__big_int__ === "string") {
     return BigInt(value.__big_int__);
   }
@@ -261,24 +208,24 @@ function decodeValue(value: unknown): unknown {
   }
 
   return Object.fromEntries(
-    Object.entries(value).map(([key, entry]) => [key, decodeValue(entry)])
+    Object.entries(value).map(([key, entry]) => [key, decodeValue(entry, profile)])
   );
 }
 
-export function decodeRuntime<T = unknown>(value: string | Uint8Array | null | undefined): T | null {
+export function decodeRuntime<T = unknown>(value: string | Uint8Array | null | undefined, profile: XianVmProfile = "xian_vm_v1"): T | null {
   if (value == null) {
     return null;
   }
   const text = value instanceof Uint8Array ? bytesToUtf8(value) : value;
   try {
-    return decodeValue(JSON.parse(preserveUnsafeIntegerTokens(text))) as T;
+    return decodeValue(parseRuntimeJson(text, profile), profile) as T;
   } catch {
     return null;
   }
 }
 
-export function canonicalizeRuntime(value: unknown): string {
-  return encodeRuntime(value);
+export function canonicalizeRuntime(value: unknown, profile: XianVmProfile = "xian_vm_v1"): string {
+  return encodeRuntime(value, profile);
 }
 
 export function parseXianNumber(value: string): number | bigint {

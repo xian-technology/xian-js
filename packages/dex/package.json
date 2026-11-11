@@ -1,6 +1,6 @@
 {
   "name": "@xian-tech/dex",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Deterministic Xian DEX quoting and transaction planning",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -48,5 +48,8 @@
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build": "npm run clean && tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@xian-tech/types": "0.3.3"
   }
 }

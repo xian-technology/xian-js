@@ -61,3 +61,30 @@ for (const receipt of vectors.node_receipts) {
     expect(prepared.txHash).toBe(receipt.tx_hash);
   });
 }
+
+const v2 = JSON.parse(readFileSync(new URL(
+  "../../../../xian-contracting/tests/fixtures/transaction_numeric_v2.json", import.meta.url
+), "utf8"));
+
+describe("fresh-chain contract numbers", () => {
+  for (const vector of v2.cases) {
+    it(`signs exact numeric values: ${vector.name}`, async () => {
+      const signer = new Ed25519Signer(v2.private_key);
+      const client = new XianClient({ rpcUrl: "http://localhost", vmProfile: "xian_vm_v2" });
+      const signed = await client.signTx({payload: vector.payload}, signer);
+      expect(prepareTransaction(signed, "xian_vm_v2").json).toBe(vector.transaction_json);
+    });
+  }
+
+  it("rejects unsafe numbers and invalid numeric wrappers before signing", async () => {
+    const client = new XianClient({ rpcUrl: "http://localhost", vmProfile: "xian_vm_v2" });
+    for (const value of [
+      0.1, Number.MAX_SAFE_INTEGER + 1, 1n << 512n,
+      { __fixed__: "1.230" }, { __fixed__: 1 }, { __fixed__: "-0" },
+      { __fixed__: "1", extra: "field" }, { __big_int__: "42" }
+    ]) {
+      const payload = { ...v2.cases[0].payload, kwargs: { value: [value] } };
+      await expect(client.signTx({payload}, new Ed25519Signer(v2.private_key))).rejects.toThrow();
+    }
+  });
+});

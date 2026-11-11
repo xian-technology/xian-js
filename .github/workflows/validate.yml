@@ -39,11 +39,16 @@ jobs:
         with:
           path: xian-js
 
+      - name: Read pinned compiler and runtime revision
+        id: compiler
+        working-directory: xian-js
+        run: jq -er '"sha=" + .components["xian-contracting"].ref' release-manifest.json >> "$GITHUB_OUTPUT"
+
       - name: Check out xian-contracting
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           repository: ${{ github.repository_owner }}/xian-contracting
-          ref: main
+          ref: ${{ steps.compiler.outputs.sha }}
           path: xian-contracting
 
       - name: Check out xian-meta

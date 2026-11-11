@@ -50,3 +50,9 @@ row remains available as `raw`. Event consumers should read both `dataIndexed`
 (indexed identifiers) and `data` (other fields). An absent recent-events index
 returns `available: false`; an available index with no events returns an empty
 list with `available: true`.
+
+For a fresh chain, construct `XianClient` with `vmProfile: "xian_vm_v2"`.
+Pass decimals as `fixed("1.25")` and integers above the safe-integer range
+as `bigint`. For user-entered nested JSON use `parseContractJson(text)`. It
+reads numeric tokens before JavaScript rounds them. Contract calls and state
+reads return decimals as exact strings and large integers as `bigint`.

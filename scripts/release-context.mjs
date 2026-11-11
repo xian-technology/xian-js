@@ -28,6 +28,7 @@ const POLICIES = {
     },
     internalDependencies: [
       ["packages/client/package.json", "dependencies", "@xian-tech/types"],
+      ["packages/dex/package.json", "dependencies", "@xian-tech/types"],
       ["packages/provider/package.json", "dependencies", "@xian-tech/types"],
       ["packages/web-kit/package.json", "dependencies", "@xian-tech/provider"],
     ],

@@ -1,17 +1,41 @@
 # `@xian-tech/dex`
 
-Dependency-free routing and transaction-planning primitives for DEX clients,
+Routing and transaction-planning primitives for DEX clients,
 agents, and browser applications. The package performs no RPC reads, key
 handling, simulation, signing, or submission.
 
-The public surface has three layers:
+The package provides
 
 - protocol-neutral route enumeration driven by caller-supplied pool and quote
   adapters;
 - reusable constant-product pricing with numeric or string pool IDs and
   optional per-pool fees;
 - an explicit canonical Xian DEX v1 adapter for `con_pairs` / `con_dex` call
-  shapes and fee-on-transfer behavior.
+  shapes and fee-on-transfer behavior;
+- an exact adapter for fresh chains using the V2 numeric profile.
+
+## Exact amounts on V2
+
+Pass token amounts, pool reserves and allowances as decimal strings. Read
+`precision0` and `precision1` from each token's `metadata["precision"]`.
+Absent precision uses all 30 decimal places. The planner floors the input
+and every hop output to the corresponding token precision. Its approval and
+swap calls contain canonical `__fixed__` values.
+
+```ts
+const quote = selectBestXianDexV2ExactInRoute({
+  pairs: [{ id: 1, token0: "currency", token1: "con_token",
+    reserve0: "100.25", reserve1: "201.5", precision0: 8, precision1: 6 }],
+  fromToken: "currency", toToken: "con_token", amountIn: "0.01"
+});
+if (quote) {
+  const plan = planXianDexV2ExactInExecution({
+    quote, recipient, allowance: "0", slippageBps: 50,
+    deadline: deadlineFromNow(5)
+  });
+  for (const call of plan.calls) await submitCall(call);
+}
+```
 
 ## Canonical Xian DEX v1
 
@@ -81,8 +105,8 @@ custom-ABI example.
 ## Boundaries
 
 - Pool state and quote adapters are caller-owned.
-- All built-in quote math currently uses JavaScript numbers. Consumers needing
-  arbitrary precision must validate against on-chain simulation before signing.
+- V1 and generic quote adapters use JavaScript numbers. The V2 adapter uses
+  integer arithmetic at the VM’s fixed-point scale.
 - The generic router handles simple non-split exact-input routes. DEX-specific
   split routing or concentrated-liquidity traversal belongs in an adapter or a
   future focused module.
@@ -105,5 +129,5 @@ XIAN_PRIVATE_KEY="$XIAN_PRIVATE_KEY" npm run test:live:dex
 ```
 
 The smoke test reads real reserves and signer fees, plans through the Xian DEX
-v1 adapter, submits any required approval plus the exact planned router call,
+V2 adapter, submits any required approval plus the exact planned router call,
 and requires finalized successful receipts.

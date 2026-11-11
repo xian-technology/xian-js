@@ -1,6 +1,6 @@
 {
   "name": "@xian-tech/client",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Typed Xian client, tx helpers, and Ed25519 signer",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -31,11 +31,11 @@
   "dependencies": {
     "@noble/curves": "2.2.0",
     "@noble/hashes": "^2.2.0",
-    "@xian-tech/types": "0.3.2",
+    "@xian-tech/types": "0.3.3",
     "tweetnacl": "^1.0.3"
   },
   "peerDependencies": {
-    "@xian-tech/compiler": "^0.2.0"
+    "@xian-tech/compiler": "^0.2.1"
   },
   "peerDependenciesMeta": {
     "@xian-tech/compiler": {

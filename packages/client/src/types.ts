@@ -1,3 +1,4 @@
+import type { XianVmProfile } from "./numeric.js";
 import type {
   BroadcastMode,
   XianNumber,
@@ -18,6 +19,7 @@ export type {
 
 export interface XianClientOptions {
   rpcUrl: string;
+  vmProfile?: XianVmProfile;
   dashboardUrl?: string;
   chainId?: string;
   fetchFn?: typeof fetch;

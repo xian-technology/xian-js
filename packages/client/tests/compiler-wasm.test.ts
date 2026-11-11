@@ -78,6 +78,17 @@ describe.runIf(process.env.XIAN_WASM_COMPILER_TEST === "1")(
       ).toBeUndefined();
     });
 
+    it("preserves a V2 source decimal through the installed WASM compiler", async () => {
+      const exact = "9007199254740993.000000000000000000000000000001";
+      const artifacts = await compileContractArtifacts({
+        moduleName: "con_amount",
+        source: "@export\ndef amount():\n    return " + exact + "\n",
+        vmProfile: "xian_vm_v2"
+      });
+      expect(artifacts.vm_profile).toBe("xian_vm_v2");
+      expect(artifacts.vm_ir_json).toContain(exact);
+    });
+
     it("compiles source through the installed WASM package without injection", async () => {
       const artifacts = await compileContractArtifacts({
         moduleName: "con_counter",

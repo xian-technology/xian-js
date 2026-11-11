@@ -23,6 +23,7 @@ export {
   canonicalizeRuntime,
   decodeRuntime,
   encodeRuntime,
+  parseContractJson,
   parseXianNumber,
   sortKeysDeep
 } from "./encoding.js";
@@ -44,3 +45,5 @@ export { WatchApi } from "./watch.js";
 export type * from "./types.js";
 
 export { prepareTransaction, type PreparedTransaction } from "./transaction.js";
+
+export { fixed, type XianVmProfile } from "./numeric.js";

@@ -59,6 +59,19 @@ const submission = await client.broadcastTx(signedTx, { mode: "checktx" });
 console.log(submission.txHash);
 ```
 
+On a fresh chain configured for `xian_vm_v2`, set `vmProfile: "xian_vm_v2"`
+in the client constructor. Pass large integers as `bigint` and decimal
+amounts as `fixed("0.000000000000000000000000000001")` from
+`@xian-tech/client`. Use exact decimal strings for token helpers.
+The SDK checks limits before signing or simulation. Decoded contract
+decimals are plain strings. The default client profile is `xian_vm_v1`.
+
+For V2 swaps, `selectBestXianDexV2ExactInRoute` accepts reserve and input
+amounts as strings. Supply each token's precision from metadata using
+`precision0` and `precision1`. Omit them for tokens with no declared
+precision. `planXianDexV2ExactInExecution` produces ready-to-sign approval
+and swap calls with the same truncation as the router.
+
 ### DEX Planning
 
 Plan an exact-input DEX swap without coupling route logic to an RPC or wallet:

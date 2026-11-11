@@ -1,3 +1,4 @@
+import { fixed, parseInteger, type XianVmProfile } from "./numeric.js";
 import { prepareTransaction, type PreparedTransaction } from "./transaction.js";
 import {
   base64ToUtf8,
@@ -420,6 +421,7 @@ function validatePayload(payload: XianTxPayload): void {
 
 export class XianClient {
   readonly rpcUrl: string;
+  readonly vmProfile: XianVmProfile;
   readonly dashboardUrl?: string;
   readonly watch: WatchApi;
 
@@ -430,6 +432,10 @@ export class XianClient {
 
   constructor(options: XianClientOptions) {
     this.rpcUrl = stripTrailingSlash(options.rpcUrl);
+    this.vmProfile = options.vmProfile ?? "xian_vm_v1";
+    if (this.vmProfile !== "xian_vm_v1" && this.vmProfile !== "xian_vm_v2") {
+      throw new TypeError("unsupported VM profile");
+    }
     this.dashboardUrl = options.dashboardUrl
       ? stripTrailingSlash(options.dashboardUrl)
       : undefined;
@@ -522,15 +528,33 @@ export class XianClient {
     options?: XianAbciQueryOptions
   ): Promise<T | null> {
     const data = await this.abciQuery(path, options);
-    const value = asRecord(asRecord(data.result).response).value;
-    return this.decodeAbciValue(value) as T | null;
+    const response = asRecord(asRecord(data.result).response);
+    return this.decodeAbciValue(response.value, response.info) as T | null;
   }
 
-  private decodeAbciValue(value: unknown): unknown {
+  private decodeAbciValue(value: unknown, info?: unknown): unknown {
     if (value == null || value === EMPTY_ABCI_VALUE) {
       return null;
     }
     const decodedUtf8 = base64ToUtf8(String(value));
+    if (info === "json") return JSON.parse(decodedUtf8);
+    if (this.vmProfile === "xian_vm_v2") {
+      if (info === "decimal") {
+        if (fixed(decodedUtf8).__fixed__ !== decodedUtf8) throw new TypeError("noncanonical decimal state");
+        return decodedUtf8;
+      }
+      if (info === "int") {
+        const integer = parseInteger(decodedUtf8);
+        return Number.isSafeInteger(Number(integer)) ? Number(integer) : integer;
+      }
+      if (info === "str") return decodedUtf8;
+      if (info === "bool") return decodedUtf8 === "True";
+      if (info === "dict" || info === "list") {
+        const result = decodeRuntime(decodedUtf8, this.vmProfile);
+        if (result == null) throw new TypeError("invalid contract state");
+        return result;
+      }
+    }
     const decoded = decodeRuntime(decodedUtf8);
     if (decoded == null) {
       return normalizeMaybeNumber(decodedUtf8);
@@ -541,7 +565,9 @@ export class XianClient {
   private normalizeTxLookup(data: Record<string, unknown>): TransactionReceipt {
     const result = asRecord(data.result ?? {});
     const txResult = asRecord(result.tx_result ?? {});
-    const execution = txResult.data == null ? undefined : parseJsonResult(base64ToUtf8(String(txResult.data)));
+    const executionText = txResult.data == null ? undefined : base64ToUtf8(String(txResult.data));
+    const execution = executionText === undefined ? undefined :
+      this.vmProfile === "xian_vm_v2" ? decodeRuntime(executionText, this.vmProfile) : parseJsonResult(executionText);
     const transaction = result.tx == null ? undefined : (this.decodeTxRecord(String(result.tx)) as XianSignedTransaction);
 
     if ("error" in data) {
@@ -568,11 +594,11 @@ export class XianClient {
 
   private decodeTxRecord(value: string): unknown {
     const hexPayload = base64ToUtf8(value);
-    const decoded = decodeRuntime(hexPayload);
+    const decoded = decodeRuntime(hexPayload, this.vmProfile);
     if (decoded != null) {
       return decoded;
     }
-    return decodeRuntime(bytesToUtf8(hexToBytes(hexPayload)));
+    return decodeRuntime(bytesToUtf8(hexToBytes(hexPayload)), this.vmProfile);
   }
 
   async getGenesis(): Promise<Record<string, unknown>> {
@@ -628,13 +654,13 @@ export class XianClient {
   async getBalance(address: string, options?: { contract?: string }): Promise<unknown> {
     const contract = options?.contract ?? "currency";
     try {
-      const simulation = await this.simulate({
+      const balance = await this.call({
         sender: address,
         contract,
         function: "balance_of",
         kwargs: { address }
       });
-      return normalizeMaybeNumber(simulation.result);
+      return this.vmProfile === "xian_vm_v2" ? balance : normalizeMaybeNumber(balance);
     } catch {
       return this.getState(contract, "balances", [address]);
     }
@@ -1011,7 +1037,7 @@ export class XianClient {
       kwargs: request.kwargs,
       sender: request.sender
     });
-    const encoded = bytesToHex(utf8ToBytes(encodeRuntime(payload)));
+    const encoded = bytesToHex(utf8ToBytes(encodeRuntime(payload, this.vmProfile)));
     const data = await this.abciQuery(`/simulate_tx/${encoded}`);
     const response = asRecord(asRecord(data.result).response);
     if (response.code != null && response.code !== 0) {
@@ -1019,7 +1045,7 @@ export class XianClient {
     }
 
     const rawValue = response.value;
-    const decoded = rawValue == null ? null : decodeRuntime<Record<string, unknown>>(base64ToUtf8(String(rawValue)));
+    const decoded = rawValue == null ? null : decodeRuntime<Record<string, unknown>>(base64ToUtf8(String(rawValue)), this.vmProfile);
     if (decoded == null) {
       throw new SimulationError("simulation response did not decode to JSON", response);
     }
@@ -1071,6 +1097,7 @@ export class XianClient {
     }) as XianTxPayload;
 
     validatePayload(payload);
+    if (this.vmProfile === "xian_vm_v2") encodeRuntime(payload.kwargs, this.vmProfile);
     return { payload };
   }
 
@@ -1083,7 +1110,7 @@ export class XianClient {
       throw new TransactionError("signer address does not match payload sender");
     }
 
-    const signature = await signer.signMessage(canonicalizeRuntime(tx.payload));
+    const signature = await signer.signMessage(canonicalizeRuntime(tx.payload, this.vmProfile));
     if (!isValidEd25519Signature(signature)) {
       throw new TransactionError("signer returned an invalid Ed25519 signature");
     }
@@ -1111,7 +1138,7 @@ export class XianClient {
           ? "broadcast_tx_commit"
           : "broadcast_tx_sync";
 
-    const encodedTx = prepareTransaction(tx).rpcHex;
+    const encodedTx = prepareTransaction(tx, this.vmProfile).rpcHex;
     const url = new URL(`${this.rpcUrl}/${endpoint}`);
     url.searchParams.set("tx", `"${encodedTx}"`);
 
@@ -1212,7 +1239,7 @@ export class XianClient {
     if (request.nonce != null) {
       const tx = await this.buildTx(request);
       const signedTx = await this.signTx(tx, request.signer);
-      await request.onPreparedTransaction?.(prepareTransaction(signedTx));
+      await request.onPreparedTransaction?.(prepareTransaction(signedTx, this.vmProfile));
       return this.broadcastTx(signedTx, broadcastOptions);
     }
 
@@ -1231,7 +1258,7 @@ export class XianClient {
           nonce: reservation.nonce
         });
         const signedTx = await this.signTx(tx, request.signer);
-        await request.onPreparedTransaction?.(prepareTransaction(signedTx));
+        await request.onPreparedTransaction?.(prepareTransaction(signedTx, this.vmProfile));
         await this.nonceReservations.assertCanBroadcast(reservation);
         broadcastAttempted = true;
         let submission: TransactionSubmission;
@@ -1388,7 +1415,8 @@ export class TokenClient {
       function: "transfer",
       kwargs: {
         to: options.to,
-        amount: options.amount
+        amount: this.client.vmProfile === "xian_vm_v2" && typeof options.amount === "string"
+          ? fixed(options.amount) : options.amount
       },
       signer: options.signer,
       mode: options.mode,
@@ -1412,7 +1440,8 @@ export class TokenClient {
       function: "approve",
       kwargs: {
         to: options.spender,
-        amount: options.amount
+        amount: this.client.vmProfile === "xian_vm_v2" && typeof options.amount === "string"
+          ? fixed(options.amount) : options.amount
       },
       signer: options.signer,
       mode: options.mode,
