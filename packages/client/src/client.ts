@@ -1,3 +1,5 @@
+import { BROADCAST_ENDPOINTS, parseBroadcastResponse } from "./broadcast.js";
+import { asRecord, readErrorMessage } from "./rpc-response.js";
 import { DEFAULT_VM_PROFILE, fixed, parseInteger, type XianVmProfile } from "./numeric.js";
 import { prepareTransaction, type PreparedTransaction } from "./transaction.js";
 import {
@@ -81,25 +83,6 @@ function isNonNegativeInteger(value: unknown): value is number | bigint {
 
 function isHexKey(value: string): boolean {
   return /^[a-fA-F0-9]{64}$/.test(value);
-}
-
-function readErrorMessage(value: Record<string, unknown>): string {
-  const data = value.data;
-  if (typeof data === "string" && data.length > 0) {
-    return data;
-  }
-  const message = value.message;
-  if (typeof message === "string" && message.length > 0) {
-    return message;
-  }
-  return "RPC error";
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  if (typeof value !== "object" || value === null) {
-    throw new TransportError("expected object response");
-  }
-  return value as Record<string, unknown>;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -1129,61 +1112,21 @@ export class XianClient {
       throw new TransactionError("mode must be one of: async, checktx, commit");
     }
 
-    const endpoint =
-      mode === "async"
-        ? "broadcast_tx_async"
-        : mode === "commit"
-          ? "broadcast_tx_commit"
-          : "broadcast_tx_sync";
-
     const encodedTx = prepareTransaction(tx, this.vmProfile).rpcHex;
-    const url = new URL(`${this.rpcUrl}/${endpoint}`);
+    const url = new URL(`${this.rpcUrl}/${BROADCAST_ENDPOINTS[mode]}`);
     url.searchParams.set("tx", `"${encodedTx}"`);
 
     const data = await this.requestJson("POST", url.toString());
-    const response = asRecord(data.result ?? {});
-    const txHash = typeof response.hash === "string" ? response.hash : undefined;
+    return this.finalizeBroadcast(parseBroadcastResponse(tx, mode, data), options);
+  }
 
-    const submission: TransactionSubmission = {
-      submitted: !("error" in data),
-      accepted: null,
-      finalized: false,
-      txHash,
-      message: "error" in data ? readErrorMessage(asRecord(data.error)) : undefined,
-      mode,
-      nonce: tx.payload.nonce,
-      chiSupplied: tx.payload.chi_supplied,
-      response: data
-    };
-
-    if ("error" in data) {
-      return submission;
-    }
-
-    if (mode === "commit") {
-      const checkTx = asRecord(response.check_tx ?? {});
-      const deliverTx = asRecord(response.deliver_tx ?? response.tx_result ?? {});
-      submission.accepted = checkTx.code === 0;
-      submission.finalized = submission.accepted && deliverTx.code === 0 && String(response.height ?? "0") !== "0";
-      submission.message = submission.accepted
-        ? submission.finalized
-          ? undefined
-          : deliverTx.log ?? "transaction was not finalized"
-        : checkTx.log ?? "CheckTx failed";
-      return submission;
-    }
-
-    if (mode === "async") {
-      if (options?.waitForTx && submission.txHash) {
-        submission.receipt = await this.waitForTx(submission.txHash, options);
-        submission.finalized = true;
-      }
-      return submission;
-    }
-
-    submission.accepted = response.code === 0;
-    submission.message = submission.accepted ? undefined : response.log ?? "CheckTx failed";
-    if (submission.accepted && options?.waitForTx && submission.txHash) {
+  private async finalizeBroadcast(
+    submission: TransactionSubmission,
+    options?: BroadcastTxOptions
+  ): Promise<TransactionSubmission> {
+    if (!submission.submitted || submission.mode === "commit") return submission;
+    if (submission.mode === "checktx" && !submission.accepted) return submission;
+    if (options?.waitForTx && submission.txHash) {
       submission.receipt = await this.waitForTx(submission.txHash, options);
       submission.finalized = true;
     }

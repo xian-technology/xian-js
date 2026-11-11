@@ -66,3 +66,15 @@ packed types, client, and provider into a temporary project outside this workspa
 and exercises public automatic sends. It requires built packages and uses npm's
 local cache populated by dependency installation. `npm run validate` includes this
 check after build and behavior tests.
+
+`XianClient.broadcastTx` validates and serializes the transaction before transport.
+The internal `broadcast.ts` module interprets RPC admission/commit evidence;
+receipt polling remains a separate client step. `rpc-response.ts` holds the shared
+RPC object checks and error-message precedence. These modules do not add public
+package exports.
+
+The reference provider dispatches known request names to explicit operation
+methods. Each operation owns its authorization, parameter parsing, chain checks,
+and client calls. Request parameters are read inside the operation, after its
+existing guards; methods that do not use parameters leave them unread. The fixed
+Map dispatcher also rejects names inherited from JavaScript object prototypes.

@@ -407,144 +407,150 @@ export class InMemoryXianProvider implements XianProvider {
     });
   }
 
-  async request(args: XianProviderRequest): Promise<unknown> {
-    switch (args.method) {
-      case "xian_connect":
-      case "xian_requestAccounts":
-        return this.connect();
+  private async getAccounts(): Promise<string[]> {
+    return this.connected ? [await this.getAddress()] : [];
+  }
 
-      case "xian_getWalletInfo":
-        return this.getWalletInfo();
-
-      case "xian_disconnect":
-        return this.disconnect();
-
-      case "xian_accounts":
-        return this.connected ? [await this.getAddress()] : [];
-
-      case "xian_chainId":
-        return this.ensureChainId();
-
-      case "xian_switchChain": {
-        const { chainId } = firstParamObject(args.params);
-        if (typeof chainId !== "string" || chainId.length === 0) {
-          throw new TypeError("xian_switchChain requires a chainId string");
-        }
-        this.chainId = chainId;
-        this.events.emit("chainChanged", chainId);
-        return null;
-      }
-
-      case "xian_signMessage": {
-        await this.requireConnected();
-        const { message } = firstParamObject(args.params);
-        if (typeof message !== "string") {
-          throw new TypeError("xian_signMessage requires a message string");
-        }
-        const [account, chainId] = await Promise.all([
-          this.getAddress(),
-          this.ensureChainId()
-        ]);
-        return this.options.signer.signMessage(
-          createXianMessageSigningPayload({ account, chainId, message })
-        );
-      }
-
-      case "xian_signTransaction": {
-        await this.requireConnected();
-        if (!this.options.client) {
-          throw new TypeError("provider client is required for xian_signTransaction");
-        }
-        const { tx } = firstParamObject(args.params);
-        const unsignedTx = tx as XianUnsignedTransaction;
-        await this.requireTransactionChain(unsignedTx);
-        return this.options.client.signTx(unsignedTx, this.options.signer);
-      }
-
-      case "xian_prepareTransaction": {
-        await this.requireConnected();
-        const { intent } = firstParamObject(args.params);
-        return this.prepareTransaction(intent as XianTransactionIntent);
-      }
-
-      case "xian_sendTransaction": {
-        await this.requireConnected();
-        if (!this.options.client) {
-          throw new TypeError("provider client is required for xian_sendTransaction");
-        }
-        const { tx, mode, waitForTx, timeoutMs, pollIntervalMs } = firstParamObject(args.params);
-        const unsignedTx = tx as XianUnsignedTransaction;
-        await this.requireTransactionChain(unsignedTx);
-        const signedTx = await this.options.client.signTx(
-          unsignedTx,
-          this.options.signer
-        );
-        return this.options.client.broadcastTx(signedTx, {
-          mode: mode as BroadcastMode | undefined,
-          waitForTx: waitForTx as boolean | undefined,
-          timeoutMs: timeoutMs as number | undefined,
-          pollIntervalMs: pollIntervalMs as number | undefined
-        });
-      }
-
-      case "xian_sendCall": {
-        await this.requireConnected();
-        const client = this.options.client;
-        if (!client) {
-          throw new TypeError("provider client is required for xian_sendCall");
-        }
-        const { intent, mode, waitForTx, timeoutMs, pollIntervalMs } = firstParamObject(
-          args.params
-        );
-        if (mode != null && !["async", "checktx", "commit"].includes(String(mode))) {
-          throw new TypeError("mode must be one of: async, checktx, commit");
-        }
-        const transactionIntent = intent as XianTransactionIntent;
-        const chainId = await this.ensureChainId();
-        if (transactionIntent.chainId && transactionIntent.chainId !== chainId) {
-          throw new ProviderChainMismatchError();
-        }
-        const sender = await this.getAddress();
-        const scope = { chainId, sender };
-        let preparedTx: XianUnsignedTransaction | undefined;
-        return this.nonceReservations.send(scope, {
-          readNetworkNonce: async () => {
-            preparedTx = await this.prepareTransaction(transactionIntent, {
-              chainId,
-              sender
-            });
-            return preparedTx.payload.nonce;
-          },
-          prepare: async (reservation) => {
-            preparedTx ??= await this.prepareTransaction(transactionIntent, {
-              chainId,
-              sender,
-              nonce: reservation.nonce
-            });
-            return client.signTx(preparedTx, this.options.signer);
-          },
-          broadcast: (signedTx) => client.broadcastTx(signedTx, {
-            mode: mode as BroadcastMode | undefined,
-            waitForTx: waitForTx as boolean | undefined,
-            timeoutMs: timeoutMs as number | undefined,
-            pollIntervalMs: pollIntervalMs as number | undefined
-          })
-        });
-      }
-
-      case "xian_watchAsset": {
-        const asset = this.normalizeWatchAssetRequest(firstParamObject(args.params));
-        const accepted = this.options.onWatchAsset
-          ? await this.options.onWatchAsset(asset)
-          : true;
-        if (accepted) {
-          this.watchedAssets.set(asset.contract, asset);
-        }
-        return accepted;
-      }
-
-      default:
-        throw new ProviderUnsupportedMethodError(args.method);
+  private switchChain(args: XianProviderRequest): null {
+    const { chainId } = firstParamObject(args.params);
+    if (typeof chainId !== "string" || chainId.length === 0) {
+      throw new TypeError("xian_switchChain requires a chainId string");
     }
+    this.chainId = chainId;
+    this.events.emit("chainChanged", chainId);
+    return null;
+  }
+
+  private async signMessage(args: XianProviderRequest): Promise<string> {
+    await this.requireConnected();
+    const { message } = firstParamObject(args.params);
+    if (typeof message !== "string") {
+      throw new TypeError("xian_signMessage requires a message string");
+    }
+    const [account, chainId] = await Promise.all([
+      this.getAddress(),
+      this.ensureChainId()
+    ]);
+    return this.options.signer.signMessage(
+      createXianMessageSigningPayload({ account, chainId, message })
+    );
+  }
+
+  private async signTransaction(args: XianProviderRequest): Promise<XianSignedTransaction> {
+    await this.requireConnected();
+    if (!this.options.client) {
+      throw new TypeError("provider client is required for xian_signTransaction");
+    }
+    const { tx } = firstParamObject(args.params);
+    const unsignedTx = tx as XianUnsignedTransaction;
+    await this.requireTransactionChain(unsignedTx);
+    return this.options.client.signTx(unsignedTx, this.options.signer);
+  }
+
+  private async requestPrepareTransaction(args: XianProviderRequest): Promise<XianUnsignedTransaction> {
+    await this.requireConnected();
+    const { intent } = firstParamObject(args.params);
+    return this.prepareTransaction(intent as XianTransactionIntent);
+  }
+
+  private async sendTransaction(args: XianProviderRequest): Promise<TransactionSubmission> {
+    await this.requireConnected();
+    if (!this.options.client) {
+      throw new TypeError("provider client is required for xian_sendTransaction");
+    }
+    const { tx, mode, waitForTx, timeoutMs, pollIntervalMs } = firstParamObject(args.params);
+    const unsignedTx = tx as XianUnsignedTransaction;
+    await this.requireTransactionChain(unsignedTx);
+    const signedTx = await this.options.client.signTx(
+      unsignedTx,
+      this.options.signer
+    );
+    return this.options.client.broadcastTx(signedTx, {
+      mode: mode as BroadcastMode | undefined,
+      waitForTx: waitForTx as boolean | undefined,
+      timeoutMs: timeoutMs as number | undefined,
+      pollIntervalMs: pollIntervalMs as number | undefined
+    });
+  }
+
+  private async sendCall(args: XianProviderRequest): Promise<TransactionSubmission> {
+    await this.requireConnected();
+    const client = this.options.client;
+    if (!client) {
+      throw new TypeError("provider client is required for xian_sendCall");
+    }
+    const { intent, mode, waitForTx, timeoutMs, pollIntervalMs } = firstParamObject(
+      args.params
+    );
+    if (mode != null && !["async", "checktx", "commit"].includes(String(mode))) {
+      throw new TypeError("mode must be one of: async, checktx, commit");
+    }
+    const transactionIntent = intent as XianTransactionIntent;
+    const chainId = await this.ensureChainId();
+    if (transactionIntent.chainId && transactionIntent.chainId !== chainId) {
+      throw new ProviderChainMismatchError();
+    }
+    const sender = await this.getAddress();
+    const scope = { chainId, sender };
+    let preparedTx: XianUnsignedTransaction | undefined;
+    return this.nonceReservations.send(scope, {
+      readNetworkNonce: async () => {
+        preparedTx = await this.prepareTransaction(transactionIntent, {
+          chainId,
+          sender
+        });
+        return preparedTx.payload.nonce;
+      },
+      prepare: async (reservation) => {
+        preparedTx ??= await this.prepareTransaction(transactionIntent, {
+          chainId,
+          sender,
+          nonce: reservation.nonce
+        });
+        return client.signTx(preparedTx, this.options.signer);
+      },
+      broadcast: (signedTx) => client.broadcastTx(signedTx, {
+        mode: mode as BroadcastMode | undefined,
+        waitForTx: waitForTx as boolean | undefined,
+        timeoutMs: timeoutMs as number | undefined,
+        pollIntervalMs: pollIntervalMs as number | undefined
+      })
+    });
+  }
+
+  private async watchAsset(args: XianProviderRequest): Promise<boolean> {
+    const asset = this.normalizeWatchAssetRequest(firstParamObject(args.params));
+    const accepted = this.options.onWatchAsset
+      ? await this.options.onWatchAsset(asset)
+      : true;
+    if (accepted) {
+      this.watchedAssets.set(asset.contract, asset);
+    }
+    return accepted;
+  }
+
+  private static readonly requestHandlers = new Map<
+    string,
+    (provider: InMemoryXianProvider, args: XianProviderRequest) => unknown
+  >([
+    ["xian_connect", (provider) => provider.connect()],
+    ["xian_requestAccounts", (provider) => provider.connect()],
+    ["xian_getWalletInfo", (provider) => provider.getWalletInfo()],
+    ["xian_disconnect", (provider) => provider.disconnect()],
+    ["xian_accounts", (provider) => provider.getAccounts()],
+    ["xian_chainId", (provider) => provider.ensureChainId()],
+    ["xian_switchChain", (provider, args) => provider.switchChain(args)],
+    ["xian_signMessage", (provider, args) => provider.signMessage(args)],
+    ["xian_signTransaction", (provider, args) => provider.signTransaction(args)],
+    ["xian_prepareTransaction", (provider, args) => provider.requestPrepareTransaction(args)],
+    ["xian_sendTransaction", (provider, args) => provider.sendTransaction(args)],
+    ["xian_sendCall", (provider, args) => provider.sendCall(args)],
+    ["xian_watchAsset", (provider, args) => provider.watchAsset(args)]
+  ]);
+
+  async request(args: XianProviderRequest): Promise<unknown> {
+    const handler = InMemoryXianProvider.requestHandlers.get(args.method);
+    if (!handler) throw new ProviderUnsupportedMethodError(args.method);
+    return handler(this, args);
   }
 }
