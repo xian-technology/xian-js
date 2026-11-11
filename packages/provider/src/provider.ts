@@ -506,58 +506,29 @@ export class InMemoryXianProvider implements XianProvider {
         }
         const sender = await this.getAddress();
         const scope = { chainId, sender };
-        return this.nonceReservations.runExclusive(scope, async () => {
-          let preparedTx: XianUnsignedTransaction | undefined;
-          const reservation = await this.nonceReservations.reserve(
-            scope,
-            async () => {
-              preparedTx = await this.prepareTransaction(transactionIntent, {
-                chainId,
-                sender
-              });
-              return preparedTx.payload.nonce;
-            }
-          );
-          let broadcastAttempted = false;
-          try {
+        let preparedTx: XianUnsignedTransaction | undefined;
+        return this.nonceReservations.send(scope, {
+          readNetworkNonce: async () => {
+            preparedTx = await this.prepareTransaction(transactionIntent, {
+              chainId,
+              sender
+            });
+            return preparedTx.payload.nonce;
+          },
+          prepare: async (reservation) => {
             preparedTx ??= await this.prepareTransaction(transactionIntent, {
               chainId,
               sender,
               nonce: reservation.nonce
             });
-            const signedTx = await client.signTx(
-              preparedTx,
-              this.options.signer
-            );
-            await this.nonceReservations.assertCanBroadcast(reservation);
-            broadcastAttempted = true;
-            let submission: TransactionSubmission;
-            try {
-              submission = await client.broadcastTx(signedTx, {
-                mode: mode as BroadcastMode | undefined,
-                waitForTx: waitForTx as boolean | undefined,
-                timeoutMs: timeoutMs as number | undefined,
-                pollIntervalMs: pollIntervalMs as number | undefined
-              });
-            } catch (error) {
-              await this.nonceReservations.quarantine(reservation);
-              throw error;
-            }
-
-            if (!submission.submitted || submission.accepted === false) {
-              await this.nonceReservations.reject(reservation);
-            } else if (submission.accepted == null && !submission.finalized) {
-              await this.nonceReservations.quarantine(reservation);
-            } else {
-              await this.nonceReservations.confirm(reservation);
-            }
-            return submission;
-          } catch (error) {
-            if (!broadcastAttempted) {
-              await this.nonceReservations.release(reservation);
-            }
-            throw error;
-          }
+            return client.signTx(preparedTx, this.options.signer);
+          },
+          broadcast: (signedTx) => client.broadcastTx(signedTx, {
+            mode: mode as BroadcastMode | undefined,
+            waitForTx: waitForTx as boolean | undefined,
+            timeoutMs: timeoutMs as number | undefined,
+            pollIntervalMs: pollIntervalMs as number | undefined
+          })
         });
       }
 

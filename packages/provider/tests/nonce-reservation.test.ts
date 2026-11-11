@@ -112,6 +112,18 @@ function clientFor(options: {
 }
 
 describe("InMemoryXianProvider automatic nonce reservations", () => {
+  it("preserves the provider error type when preparation supplies an invalid nonce", async () => {
+    const provider = new InMemoryXianProvider({
+      signer: signer("a".repeat(64)),
+      client: clientFor({ networkNonce: () => -1, observed: [] })
+    });
+    await provider.request({ method: "xian_connect" });
+    await expect(sendCall(provider)).rejects.toBeInstanceOf(TypeError);
+    await expect(sendCall(provider)).rejects.toThrow(
+      "network nonce must be a non-negative safe integer"
+    );
+  });
+
   it("waits for admission evidence after an async broadcast", async () => {
     const address = "a".repeat(64);
     const observed: Array<number | bigint> = [];

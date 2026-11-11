@@ -20,6 +20,14 @@ That means:
 - the current publishable packages are `@xian-tech/client`, `@xian-tech/dex`,
   `@xian-tech/provider`, `@xian-tech/types`, and `@xian-tech/web-kit`
 
+The next release must publish matching types, client, and provider artifacts:
+client and provider now import the types package's internal nonce runtime entry.
+The previously published types artifact does not contain that entry. Bump the
+repo/package versions and exact internal dependency pins together before tagging;
+`scripts/release-context.mjs` verifies their alignment. The packaged-install smoke
+in `npm run validate` installs the newly built tarballs together, rather than
+silently using workspace links or a prior registry types artifact.
+
 This repo is not lockstepped with `xian-wallet-browser`.
 
 - `xian-js` and `xian-wallet-browser` release independently

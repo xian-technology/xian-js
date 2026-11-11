@@ -20,7 +20,8 @@
     "test:live:dex": "node scripts/dex-live-smoke.mjs",
     "test:compiler": "npm run build --workspace @xian-tech/types && npm run build:compiler && XIAN_WASM_COMPILER_TEST=1 vitest run packages/client/tests/compiler-wasm.test.ts",
     "test:release": "node --test scripts/release-context.node-test.mjs",
-    "validate": "npm run typecheck && npm run build && npm run test && npm run test:release"
+    "validate": "npm run typecheck && npm run build && npm run test && npm run test:release && npm run test:package",
+    "test:package": "node scripts/packed-install-smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",

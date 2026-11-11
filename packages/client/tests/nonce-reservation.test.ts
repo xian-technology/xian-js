@@ -8,6 +8,7 @@ import {
 import {
   NonceReservationError,
   TransportError,
+  TransactionError,
   TxTimeoutError,
   XianClient
 } from "../src/index";
@@ -77,6 +78,16 @@ function send(
 }
 
 describe("XianClient automatic nonce reservations", () => {
+  it("preserves the client error type when the network supplies an invalid nonce", async () => {
+    const sender = "a".repeat(64);
+    const client = new XianClient({ rpcUrl: "http://node" });
+    vi.spyOn(client, "getNonce").mockResolvedValue(-1);
+    await expect(send(client, sender, signer(sender))).rejects.toBeInstanceOf(TransactionError);
+    await expect(send(client, sender, signer(sender))).rejects.toThrow(
+      "network nonce must be a non-negative safe integer"
+    );
+  });
+
   it("waits for admission evidence after an async broadcast", async () => {
     const sender = "a".repeat(64);
     let networkNonce = 7;
@@ -403,6 +414,33 @@ describe("XianClient automatic nonce reservations", () => {
     await client.resetNonceReservation(sender, "chain-a");
     await expect(send(client, sender, signer(sender))).resolves.toMatchObject({ nonce: 21 });
     expect(observed).toEqual([21, 44, 21]);
+  });
+
+  it("preserves an explicit reset made by a preparation observer that then fails", async () => {
+    const sender = "a".repeat(64);
+    const observed: XianSignedTransaction["payload"]["nonce"][] = [];
+    let networkNonce = 7;
+    const client = new XianClient({
+      rpcUrl: "http://node",
+      fetchFn: (async (input: string | URL) => {
+        if (String(input).includes("abci_query")) return nonceResponse(networkNonce);
+        observed.push(decodeBroadcast(input).payload.nonce);
+        return acceptedResponse("accepted");
+      }) as typeof fetch
+    });
+    const failure = new Error("persistence failed");
+    await expect(client.sendTx({
+      chainId: "chain-a", sender, signer: signer(sender), contract: "currency",
+      function: "transfer", kwargs: {}, chi: 100,
+      onPreparedTransaction: async () => {
+        await client.resetNonceReservation(sender, "chain-a");
+        networkNonce = 20;
+        throw failure;
+      }
+    })).rejects.toBe(failure);
+    expect(observed).toEqual([]);
+    await expect(send(client, sender, signer(sender))).resolves.toMatchObject({ nonce: 20 });
+    expect(observed).toEqual([20]);
   });
 
   it("isolates reservations by sender, chain, and client instance", async () => {

@@ -1,7 +1,7 @@
 {
   "name": "@xian-tech/types",
   "version": "0.3.3",
-  "description": "Shared TypeScript types used across the Xian JS workspace",
+  "description": "Shared TypeScript contracts and dependency-free runtime primitives for Xian",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "repository": {
@@ -16,6 +16,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./internal/nonce-reservation": {
+      "types": "./dist/internal/nonce-reservation.d.ts",
+      "import": "./dist/internal/nonce-reservation.js",
+      "default": "./dist/internal/nonce-reservation.js"
     }
   },
   "publishConfig": {

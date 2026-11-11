@@ -1243,13 +1243,9 @@ export class XianClient {
 
     const chainId = request.chainId ?? (await this.getChainId());
     const scope = { chainId, sender: request.sender };
-    return this.nonceReservations.runExclusive(scope, async () => {
-      const reservation = await this.nonceReservations.reserve(
-        scope,
-        () => this.getNonce(request.sender)
-      );
-      let broadcastAttempted = false;
-      try {
+    return this.nonceReservations.send(scope, {
+      readNetworkNonce: () => this.getNonce(request.sender),
+      prepare: async (reservation) => {
         const tx = await this.buildTx({
           ...request,
           chainId,
@@ -1257,30 +1253,9 @@ export class XianClient {
         });
         const signedTx = await this.signTx(tx, request.signer);
         await request.onPreparedTransaction?.(prepareTransaction(signedTx, this.vmProfile));
-        await this.nonceReservations.assertCanBroadcast(reservation);
-        broadcastAttempted = true;
-        let submission: TransactionSubmission;
-        try {
-          submission = await this.broadcastTx(signedTx, broadcastOptions);
-        } catch (error) {
-          await this.nonceReservations.quarantine(reservation);
-          throw error;
-        }
-
-        if (!submission.submitted || submission.accepted === false) {
-          await this.nonceReservations.reject(reservation);
-        } else if (submission.accepted == null && !submission.finalized) {
-          await this.nonceReservations.quarantine(reservation);
-        } else {
-          await this.nonceReservations.confirm(reservation);
-        }
-        return submission;
-      } catch (error) {
-        if (!broadcastAttempted) {
-          await this.nonceReservations.release(reservation);
-        }
-        throw error;
-      }
+        return signedTx;
+      },
+      broadcast: (signedTx) => this.broadcastTx(signedTx, broadcastOptions)
     });
   }
 
