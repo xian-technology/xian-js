@@ -1,4 +1,4 @@
-import { checkInteger, checkNumericWrapper, fixed, type XianVmProfile } from "./numeric.js";
+import { DEFAULT_VM_PROFILE, checkInteger, checkNumericWrapper, fixed, type XianVmProfile } from "./numeric.js";
 
 const MIN_INT64 = -(2n ** 63n);
 const MAX_INT64 = 2n ** 63n - 1n;
@@ -146,7 +146,7 @@ function stringifyCanonical(value: unknown): string | undefined {
   return JSON.stringify(value);
 }
 
-export function encodeRuntime(value: unknown, profile: XianVmProfile = "xian_vm_v1"): string {
+export function encodeRuntime(value: unknown, profile: XianVmProfile = DEFAULT_VM_PROFILE): string {
   // Object enumeration reorders integer-index keys, so emit pairs directly.
   const encoded = stringifyCanonical(encodeValue(value, profile));
   if (encoded === undefined) {
@@ -212,7 +212,7 @@ function decodeValue(value: unknown, profile: XianVmProfile): unknown {
   );
 }
 
-export function decodeRuntime<T = unknown>(value: string | Uint8Array | null | undefined, profile: XianVmProfile = "xian_vm_v1"): T | null {
+export function decodeRuntime<T = unknown>(value: string | Uint8Array | null | undefined, profile: XianVmProfile = DEFAULT_VM_PROFILE): T | null {
   if (value == null) {
     return null;
   }
@@ -224,7 +224,7 @@ export function decodeRuntime<T = unknown>(value: string | Uint8Array | null | u
   }
 }
 
-export function canonicalizeRuntime(value: unknown, profile: XianVmProfile = "xian_vm_v1"): string {
+export function canonicalizeRuntime(value: unknown, profile: XianVmProfile = DEFAULT_VM_PROFILE): string {
   return encodeRuntime(value, profile);
 }
 

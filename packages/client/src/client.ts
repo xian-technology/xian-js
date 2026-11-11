@@ -1,4 +1,4 @@
-import { fixed, parseInteger, type XianVmProfile } from "./numeric.js";
+import { DEFAULT_VM_PROFILE, fixed, parseInteger, type XianVmProfile } from "./numeric.js";
 import { prepareTransaction, type PreparedTransaction } from "./transaction.js";
 import {
   base64ToUtf8,
@@ -157,13 +157,9 @@ function normalizeMaybeBoolean(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null;
 }
 
-function normalizeMaybeRecord(value: unknown): Record<string, unknown> | null {
+function normalizeMaybeRecord(value: unknown, profile: XianVmProfile): Record<string, unknown> | null {
   if (typeof value === "string") {
-    try {
-      value = decodeRuntime(value);
-    } catch {
-      return null;
-    }
+    value = decodeRuntime(value, profile);
   }
   return value != null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -206,7 +202,8 @@ function normalizeIndexedBlock(item: Record<string, unknown>): XianIndexedBlock 
 }
 
 function normalizeIndexedTransaction(
-  item: Record<string, unknown>
+  item: Record<string, unknown>,
+  profile: XianVmProfile
 ): XianIndexedTransaction {
   return {
     txHash: normalizeMaybeString(item.tx_hash),
@@ -222,14 +219,14 @@ function normalizeIndexedTransaction(
     statusCode: normalizeMaybeInteger(item.status_code),
     chiUsed: normalizeMaybeXianNumber(item.chi_used),
     result: item.result,
-    payload: normalizeMaybeRecord(item.payload),
+    payload: normalizeMaybeRecord(item.payload, profile),
     envelope: item.envelope,
     createdAt: normalizeMaybeString(item.created_at),
     raw: item
   };
 }
 
-function normalizeIndexedEvent(item: Record<string, unknown>): XianIndexedEvent {
+function normalizeIndexedEvent(item: Record<string, unknown>, profile: XianVmProfile): XianIndexedEvent {
   return {
     id: normalizeMaybeInteger(item.id),
     blockHeight: normalizeMaybeXianNumber(item.block_height),
@@ -240,8 +237,8 @@ function normalizeIndexedEvent(item: Record<string, unknown>): XianIndexedEvent 
     event: normalizeMaybeString(item.event),
     signer: normalizeMaybeString(item.signer),
     caller: normalizeMaybeString(item.caller),
-    dataIndexed: normalizeMaybeRecord(item.data_indexed),
-    data: normalizeMaybeRecord(item.data),
+    dataIndexed: normalizeMaybeRecord(item.data_indexed, profile),
+    data: normalizeMaybeRecord(item.data, profile),
     createdAt: normalizeMaybeString(item.created_at),
     raw: item
   };
@@ -269,11 +266,11 @@ function normalizeDexCandle(item: Record<string, unknown>): XianDexCandle {
   };
 }
 
-function normalizeIndexedEvents(value: unknown): XianIndexedEvent[] {
+function normalizeIndexedEvents(value: unknown, profile: XianVmProfile): XianIndexedEvent[] {
   return Array.isArray(value)
     ? value
         .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
-        .map((item) => normalizeIndexedEvent(item))
+        .map((item) => normalizeIndexedEvent(item, profile))
     : [];
 }
 
@@ -432,7 +429,7 @@ export class XianClient {
 
   constructor(options: XianClientOptions) {
     this.rpcUrl = stripTrailingSlash(options.rpcUrl);
-    this.vmProfile = options.vmProfile ?? "xian_vm_v1";
+    this.vmProfile = options.vmProfile ?? DEFAULT_VM_PROFILE;
     if (this.vmProfile !== "xian_vm_v1" && this.vmProfile !== "xian_vm_v2") {
       throw new TypeError("unsupported VM profile");
     }
@@ -555,7 +552,7 @@ export class XianClient {
         return result;
       }
     }
-    const decoded = decodeRuntime(decodedUtf8);
+    const decoded = decodeRuntime(decodedUtf8, this.vmProfile);
     if (decoded == null) {
       return normalizeMaybeNumber(decodedUtf8);
     }
@@ -901,7 +898,7 @@ export class XianClient {
   async getIndexedTx(txHash: string): Promise<XianIndexedTransaction | null> {
     const value = await this.abciValue<unknown>(`/tx/${txHash}`);
     return value != null && typeof value === "object"
-      ? normalizeIndexedTransaction(value as Record<string, unknown>)
+      ? normalizeIndexedTransaction(value as Record<string, unknown>, this.vmProfile)
       : null;
   }
 
@@ -912,7 +909,7 @@ export class XianClient {
     return Array.isArray(value)
       ? value
           .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
-          .map((item) => normalizeIndexedTransaction(item))
+          .map((item) => normalizeIndexedTransaction(item, this.vmProfile))
       : [];
   }
 
@@ -928,7 +925,7 @@ export class XianClient {
     return Array.isArray(value)
       ? value
           .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
-          .map((item) => normalizeIndexedTransaction(item))
+          .map((item) => normalizeIndexedTransaction(item, this.vmProfile))
       : [];
   }
 
@@ -944,12 +941,12 @@ export class XianClient {
     return Array.isArray(value)
       ? value
           .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
-          .map((item) => normalizeIndexedTransaction(item))
+          .map((item) => normalizeIndexedTransaction(item, this.vmProfile))
       : [];
   }
 
   async getEventsForTx(txHash: string): Promise<XianIndexedEvent[]> {
-    return normalizeIndexedEvents(await this.abciValue<unknown>(`/events_for_tx/${txHash}`));
+    return normalizeIndexedEvents(await this.abciValue<unknown>(`/events_for_tx/${txHash}`), this.vmProfile);
   }
 
   async listEvents(
@@ -964,7 +961,8 @@ export class XianClient {
     return normalizeIndexedEvents(
       await this.abciValue<unknown>(
         `/events/${contract}/${event}/${cursor}/limit=${limit}`
-      )
+      ),
+      this.vmProfile
     );
   }
 
@@ -975,7 +973,7 @@ export class XianClient {
     if (Array.isArray(value)) {
       return {
         available: true,
-        items: normalizeIndexedEvents(value),
+        items: normalizeIndexedEvents(value, this.vmProfile),
         limit,
         offset
       };
@@ -985,7 +983,7 @@ export class XianClient {
       : {};
     return {
       available: value != null && payload.available !== false,
-      items: normalizeIndexedEvents(payload.items),
+      items: normalizeIndexedEvents(payload.items, this.vmProfile),
       limit: Number(payload.limit ?? limit),
       offset: Number(payload.offset ?? offset)
     };

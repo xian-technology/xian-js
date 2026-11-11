@@ -1,3 +1,4 @@
+import { DEFAULT_VM_PROFILE } from "./numeric.js";
 import { TransactionError } from "./errors.js";
 import type {
   ContractDeploymentArtifacts,
@@ -14,7 +15,6 @@ interface CompileContractArtifactsOptions {
 
 interface XianCompilerModule extends XianContractCompiler {}
 
-const DEFAULT_VM_PROFILE = "xian_vm_v1";
 const DEFAULT_COMPILER_MODULE = "@xian-tech/compiler";
 
 function compilerOptionsJson(vmProfile: string, lint: boolean): string {

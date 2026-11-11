@@ -45,11 +45,11 @@ describe("@xian-tech/client encoding", () => {
     expect(decoded?.balance).toBe(2n ** 60n);
   });
 
-  it("preserves unsafe integer literals while decoding runtime JSON", () => {
-    expect(decodeRuntime("-9007199254740992")).toBe(-9007199254740992n);
+  it("preserves historical bare integer literals in explicit V1 mode", () => {
+    expect(decodeRuntime("-9007199254740992", "xian_vm_v1")).toBe(-9007199254740992n);
     expect(
       decodeRuntime(
-        '{"safe":42,"unsafe":-9007199254740992,"text":"-9007199254740992"}'
+        '{"safe":42,"unsafe":-9007199254740992,"text":"-9007199254740992"}', "xian_vm_v1"
       )
     ).toEqual({
       safe: 42,

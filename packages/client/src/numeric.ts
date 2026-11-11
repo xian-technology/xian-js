@@ -4,6 +4,8 @@ export { fixed } from "@xian-tech/types";
 /** Wire rules pinned by the chain at genesis. */
 export type XianVmProfile = "xian_vm_v1" | "xian_vm_v2";
 
+export const DEFAULT_VM_PROFILE: XianVmProfile = "xian_vm_v2";
+
 const MAX_INTEGER = (1n << 512n) - 1n;
 const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
 export function checkInteger(value: bigint): void {

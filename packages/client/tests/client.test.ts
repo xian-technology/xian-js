@@ -1218,7 +1218,7 @@ it("preserves V2 simulated and persisted decimals through public reads", async (
   const amount = "9007199254740993.123456789012345678901234567891";
   let captured = "";
   const client = new XianClient({
-    rpcUrl: "http://localhost", vmProfile: "xian_vm_v2",
+    rpcUrl: "http://localhost",
     fetchFn: (async (input: string | URL) => {
       const path = new URL(String(input)).searchParams.get("path")!;
       if (path.includes("/simulate_tx/")) {
@@ -1236,7 +1236,6 @@ it("preserves V2 simulated and persisted decimals through public reads", async (
 it("reads operator telemetry as ordinary JSON on V2", async () => {
   const client = new XianClient({
     rpcUrl: "http://localhost",
-    vmProfile: "xian_vm_v2",
     fetchFn: async () => jsonResponse({
       result: { response: { info: "json", value: btoa('{"queue_ratio":0.125}') } }
     })
@@ -1248,7 +1247,6 @@ it("uses exact storage balance after a contract-level balance_of error", async (
   const balance = "9007199254740993.125";
   const client = new XianClient({
     rpcUrl: "http://localhost",
-    vmProfile: "xian_vm_v2",
     fetchFn: async (input) => {
       const response = String(input).includes("simulate_tx")
         ? { value: btoa('{"status":1,"result":"function missing"}') }
@@ -1266,7 +1264,6 @@ it("decodes nested V2 contract numbers in a committed receipt", async () => {
   }));
   const client = new XianClient({
     rpcUrl: "http://localhost",
-    vmProfile: "xian_vm_v2",
     fetchFn: async () => jsonResponse({ result: { hash: "A", tx_result: { code: 0, data } } })
   });
   const receipt = await client.getTx("A");

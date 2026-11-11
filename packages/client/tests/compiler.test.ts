@@ -4,13 +4,13 @@ import { TransactionError } from "../src/errors";
 import { compileContractArtifacts } from "../src/compiler";
 
 describe("contract compiler bridge", () => {
-  it("uses the WASM JSON compiler API with xian_vm_v1 options", async () => {
+  it("uses the WASM JSON compiler API with xian_vm_v2 options", async () => {
     const compiler = {
       compileContractArtifactJson: vi.fn(() =>
         JSON.stringify({
           format: "xian_contract_artifact_v1",
           module_name: "con_counter",
-          vm_profile: "xian_vm_v1",
+          vm_profile: "xian_vm_v2",
           source: "counter = Variable()\n",
           vm_ir_json: "{}",
           hashes: {
@@ -30,12 +30,12 @@ describe("contract compiler bridge", () => {
     expect(artifacts).toMatchObject({
       format: "xian_contract_artifact_v1",
       module_name: "con_counter",
-      vm_profile: "xian_vm_v1"
+      vm_profile: "xian_vm_v2"
     });
     expect(compiler.compileContractArtifactJson).toHaveBeenCalledWith(
       "con_counter",
       "counter = Variable()\n",
-      JSON.stringify({ lint: true, vm_profile: "xian_vm_v1" })
+      JSON.stringify({ lint: true, vm_profile: "xian_vm_v2" })
     );
   });
 

@@ -1,3 +1,4 @@
+export { compileContractArtifacts } from "./compiler.js";
 export { XianClient, ContractClient, TokenClient } from "./client.js";
 export {
   XianShieldedRelayerClient,

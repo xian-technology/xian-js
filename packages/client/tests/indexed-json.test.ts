@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { XianClient } from "../src/index";
+import { XianClient, type XianVmProfile } from "../src/index";
 
-function clientWith(value: unknown): XianClient {
+function clientWith(value: unknown, vmProfile?: XianVmProfile): XianClient {
   return new XianClient({
     rpcUrl: "http://127.0.0.1:26657",
+    vmProfile,
     fetchFn: (async () => new Response(JSON.stringify({ result: { response: {
       code: 0, value: value == null ? "AA==" : Buffer.from(JSON.stringify(value)).toString("base64")
     } } }))) as typeof fetch
@@ -11,13 +12,16 @@ function clientWith(value: unknown): XianClient {
 }
 
 describe("indexed JSON columns", () => {
-  it("decodes real BDS event columns without losing large integers or prototype-named data", async () => {
+  it.each([
+    [undefined, '{"__big_int__":"1208925819614629174706176"}'],
+    ["xian_vm_v1", "1208925819614629174706176"]
+  ] as const)("decodes BDS event columns with the selected profile %s", async (profile, amount) => {
     const row = {
       id: 44, contract: "con_nft", event: "Transfer",
       data_indexed: '{"token_id":"visible-live","from":"","to":"alice"}',
-      data: '{"amount":1208925819614629174706176,"__proto__":{"note":"data"}}'
+      data: `{"amount":${amount},"__proto__":{"note":"data"}}`
     };
-    const client = clientWith([row]);
+    const client = clientWith([row], profile);
     const [event] = await client.listEvents("con_nft", "Transfer");
     expect(event.dataIndexed).toEqual({ token_id: "visible-live", from: "", to: "alice" });
     expect(event.data?.amount).toBe(2n ** 80n);
@@ -25,7 +29,7 @@ describe("indexed JSON columns", () => {
     expect(event.data?.note).toBeUndefined();
     expect(event.raw).toEqual(row);
     expect((await client.getEventsForTx("hash"))[0].data).toEqual(event.data);
-    expect((await clientWith({ available: true, items: [row] }).getRecentEvents()).items[0].data).toEqual(event.data);
+    expect((await clientWith({ available: true, items: [row] }, profile).getRecentEvents()).items[0].data).toEqual(event.data);
   });
 
   it("accepts object columns and treats malformed/non-object JSON as absent", async () => {

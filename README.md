@@ -42,7 +42,6 @@ import { Ed25519Signer, XianClient } from "@xian-tech/client";
 
 const signer = new Ed25519Signer();
 const client = new XianClient({
-  vmProfile: "xian_vm_v2",
   rpcUrl: "http://127.0.0.1:26657",
   dashboardUrl: "http://127.0.0.1:8080",
 });
@@ -60,12 +59,11 @@ const submission = await client.broadcastTx(signedTx, { mode: "checktx" });
 console.log(submission.txHash);
 ```
 
-On a fresh chain configured for `xian_vm_v2`, set `vmProfile: "xian_vm_v2"`
-in the client constructor. Pass large integers as `bigint` and decimal
+New clients, standalone wire helpers, offline transaction preparation and the compiler bridge use `xian_vm_v2` by default. Pass large integers as `bigint` and decimal
 amounts as `fixed("0.000000000000000000000000000001")` from
 `@xian-tech/client`. Use exact decimal strings for token helpers.
 The SDK checks limits before signing or simulation. Decoded contract
-decimals are plain strings. The default client profile is `xian_vm_v1`.
+decimals are plain strings. For historical chain data, explicitly select `vmProfile: "xian_vm_v1"` on the client or compiler bridge, or pass `"xian_vm_v1"` as the second argument to a standalone wire helper.
 
 For V2 swaps, `selectBestXianDexV2ExactInRoute` accepts reserve and input
 amounts as strings. Supply each token's precision from metadata using
@@ -80,19 +78,19 @@ Plan an exact-input DEX swap without coupling route logic to an RPC or wallet:
 ```ts
 import {
   deadlineFromNow,
-  planXianDexV1ExactInExecution,
-  selectBestXianDexV1ExactInRoute,
+  planXianDexV2ExactInExecution,
+  selectBestXianDexV2ExactInRoute,
 } from "@xian-tech/dex";
 
-const quote = selectBestXianDexV1ExactInRoute({
+const quote = selectBestXianDexV2ExactInRoute({
   pairs,
   fromToken: "currency",
   toToken: "con_usdc",
-  amountIn: 10,
+  amountIn: "10",
 });
 if (!quote) throw new Error("No route");
 
-const plan = planXianDexV1ExactInExecution({
+const plan = planXianDexV2ExactInExecution({
   quote,
   recipient: agentAddress,
   allowance,
@@ -154,7 +152,6 @@ import { Ed25519Signer, XianClient } from "@xian-tech/client";
 
 const signer = new Ed25519Signer(process.env.XIAN_PRIVATE_KEY);
 const client = new XianClient({
-  vmProfile: "xian_vm_v2",
   rpcUrl: "http://127.0.0.1:26657",
   dashboardUrl: "http://127.0.0.1:8080",
 });

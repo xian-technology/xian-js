@@ -19,6 +19,7 @@ export type {
 
 export interface XianClientOptions {
   rpcUrl: string;
+  /** Defaults to xian_vm_v2. Select xian_vm_v1 for historical chain data. */
   vmProfile?: XianVmProfile;
   dashboardUrl?: string;
   chainId?: string;

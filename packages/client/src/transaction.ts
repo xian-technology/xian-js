@@ -1,6 +1,6 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, encodeRuntime, sortKeysDeep, utf8ToBytes } from "./encoding.js";
-import type { XianVmProfile } from "./numeric.js";
+import { DEFAULT_VM_PROFILE, type XianVmProfile } from "./numeric.js";
 import type { XianSignedTransaction } from "./types.js";
 
 export interface PreparedTransaction {
@@ -10,7 +10,7 @@ export interface PreparedTransaction {
 }
 
 /** The exact bytes CometBFT stores are the ASCII hex of the canonical JSON. */
-export function prepareTransaction(tx: XianSignedTransaction, profile: XianVmProfile = "xian_vm_v1"): PreparedTransaction {
+export function prepareTransaction(tx: XianSignedTransaction, profile: XianVmProfile = DEFAULT_VM_PROFILE): PreparedTransaction {
   const json = encodeRuntime(sortKeysDeep(tx), profile);
   const rpcHex = bytesToHex(utf8ToBytes(json));
   return Object.freeze({ json, rpcHex, txHash: bytesToHex(sha256(utf8ToBytes(rpcHex))).toUpperCase() });

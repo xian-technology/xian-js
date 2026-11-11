@@ -6,7 +6,7 @@ import {
   hexToBytes
 } from "../src/encoding";
 import { Ed25519Signer, XianClient } from "../src/index";
-import { compileContractArtifacts } from "../src/compiler";
+import { compileContractArtifacts } from "../src/index";
 
 const COUNTER_SOURCE = `
 counter = Variable()
@@ -82,17 +82,17 @@ describe.runIf(process.env.XIAN_WASM_COMPILER_TEST === "1")(
       const exact = "9007199254740993.000000000000000000000000000001";
       const artifacts = await compileContractArtifacts({
         moduleName: "con_amount",
-        source: "@export\ndef amount():\n    return " + exact + "\n",
-        vmProfile: "xian_vm_v2"
+        source: "@export\ndef amount():\n    return " + exact + "\n"
       });
       expect(artifacts.vm_profile).toBe("xian_vm_v2");
       expect(artifacts.vm_ir_json).toContain(exact);
     });
 
-    it("compiles source through the installed WASM package without injection", async () => {
+    it("compiles explicit V1 source through the installed WASM package", async () => {
       const artifacts = await compileContractArtifacts({
         moduleName: "con_counter",
-        source: COUNTER_SOURCE
+        source: COUNTER_SOURCE,
+        vmProfile: "xian_vm_v1"
       });
 
       expect(artifacts.format).toBe("xian_contract_artifact_v1");

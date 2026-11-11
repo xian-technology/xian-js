@@ -51,8 +51,10 @@ row remains available as `raw`. Event consumers should read both `dataIndexed`
 returns `available: false`; an available index with no events returns an empty
 list with `available: true`.
 
-For a fresh chain, construct `XianClient` with `vmProfile: "xian_vm_v2"`.
+The client, compiler bridge, standalone wire codecs and transaction preparation default to `xian_vm_v2`. For a historical chain, explicitly set `vmProfile: "xian_vm_v1"` or pass `"xian_vm_v1"` to the standalone helpers.
 Pass decimals as `fixed("1.25")` and integers above the safe-integer range
 as `bigint`. For user-entered nested JSON use `parseContractJson(text)`. It
 reads numeric tokens before JavaScript rounds them. Contract calls and state
 reads return decimals as exact strings and large integers as `bigint`.
+
+Use `compileContractArtifacts({ moduleName, source })` from `@xian-tech/client` with the optional WASM compiler installed to inspect a V2 artifact offline. Pass `vmProfile: "xian_vm_v1"` to compile historical sources. Deployments send cleartext source to the validator.
