@@ -111,8 +111,8 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Build shared compiler
-        run: npm run build:compiler
+      - name: Test the installed WASM compiler
+        run: npm run test:compiler
 
       - name: Audit production dependencies
         run: npm audit --audit-level=critical --omit=dev

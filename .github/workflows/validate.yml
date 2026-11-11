@@ -85,9 +85,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build shared compiler
-        run: npm run build:compiler
-
       - name: Run compiler WASM integration tests
         run: npm run test:compiler
 
