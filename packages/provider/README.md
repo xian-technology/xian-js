@@ -56,7 +56,8 @@ The reference provider coordinates automatic nonces for concurrent
 same-scope build/sign/broadcast lifecycle is serialized so CheckTx sees the
 contiguous nonce order; different chains remain independent.
 Prebuilt `xian_sendTransaction` payloads bypass that manager. Ambiguous
-broadcast failures block further automatic calls until the network nonce
+broadcast failures and async acknowledgments without finalization block
+further automatic calls until the network nonce
 advances; a wallet owner can explicitly call `resetNonceReservation()` only
 after independently reconciling the transaction outcome.
 

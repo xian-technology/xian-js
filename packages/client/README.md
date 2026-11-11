@@ -33,7 +33,8 @@ and sender, including across concurrent calls. It serializes each same-scope
 build/sign/broadcast lifecycle so sequential nonces reach CheckTx in order;
 different senders and chains remain concurrent. Explicit nonces bypass the
 manager. Structured rejection makes the next send refresh the network nonce;
-an ambiguous transport or wait timeout blocks further automatic sends until
+an async acknowledgment without finalization, ambiguous transport failure,
+or wait timeout blocks further automatic sends until
 the network nonce advances or the caller deliberately invokes
 `resetNonceReservation(...)` after independent reconciliation.
 

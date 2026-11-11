@@ -53,7 +53,7 @@ function submission(
   };
 }
 
-function sendCall(provider: InMemoryXianProvider, to = "bob") {
+function sendCall(provider: InMemoryXianProvider, to = "bob", mode: "async" | "checktx" = "checktx") {
   return provider.request({
     method: "xian_sendCall",
     params: [
@@ -64,7 +64,7 @@ function sendCall(provider: InMemoryXianProvider, to = "bob") {
           kwargs: { to, amount: 1 },
           chi: 100
         },
-        mode: "checktx"
+        mode
       }
     ]
   });
@@ -112,6 +112,45 @@ function clientFor(options: {
 }
 
 describe("InMemoryXianProvider automatic nonce reservations", () => {
+  it("waits for admission evidence after an async broadcast", async () => {
+    const address = "a".repeat(64);
+    const observed: Array<number | bigint> = [];
+    let networkNonce = 7;
+    const client = clientFor({ networkNonce: () => networkNonce, observed,
+      onBroadcast: vi.fn(async (tx) => {
+        observed.push(tx.payload.nonce);
+        return { ...submission(tx.payload.nonce, null), mode: "async" };
+      })
+    });
+    const provider = new InMemoryXianProvider({ signer: signer(address), client });
+    await provider.request({ method: "xian_connect" });
+
+    await expect(sendCall(provider, "bob", "async")).resolves.toMatchObject({ accepted: null, finalized: false, nonce: 7 });
+    await expect(sendCall(provider)).rejects.toBeInstanceOf(ProviderNonceReservationError);
+    expect(observed).toEqual([7]);
+
+    networkNonce = 8;
+    await expect(sendCall(provider)).resolves.toMatchObject({ nonce: 8 });
+    expect(observed).toEqual([7, 8]);
+  });
+
+  it("advances after an async transaction finalizes", async () => {
+    const address = "a".repeat(64);
+    const observed: Array<number | bigint> = [];
+    const client = clientFor({ networkNonce: () => 7, observed,
+      onBroadcast: vi.fn(async (tx) => {
+        observed.push(tx.payload.nonce);
+        return { ...submission(tx.payload.nonce, null), finalized: true, mode: "async" };
+      })
+    });
+    const provider = new InMemoryXianProvider({ signer: signer(address), client });
+    await provider.request({ method: "xian_connect" });
+
+    await expect(sendCall(provider, "bob", "async")).resolves.toMatchObject({ finalized: true, nonce: 7 });
+    await expect(sendCall(provider)).resolves.toMatchObject({ nonce: 8 });
+    expect(observed).toEqual([7, 8]);
+  });
+
   it("reserves distinct nonces for concurrent intent sends", async () => {
     const address = "a".repeat(64);
     const observed: Array<number | bigint> = [];

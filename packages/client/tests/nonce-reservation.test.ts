@@ -77,6 +77,46 @@ function send(
 }
 
 describe("XianClient automatic nonce reservations", () => {
+  it("waits for admission evidence after an async broadcast", async () => {
+    const sender = "a".repeat(64);
+    let networkNonce = 7;
+    const observed: Array<number | bigint> = [];
+    const client = new XianClient({ rpcUrl: "http://node", fetchFn: (async (input: string | URL) => {
+      if (String(input).includes("abci_query")) return nonceResponse(networkNonce);
+      observed.push(decodeBroadcast(input).payload.nonce);
+      return acceptedResponse("hash");
+    }) as typeof fetch });
+
+    await expect(client.sendTx({ sender, signer: signer(sender), chainId: "chain-a",
+      contract: "currency", function: "transfer", kwargs: {}, chi: 100, mode: "async"
+    })).resolves.toMatchObject({ accepted: null, finalized: false, nonce: 7 });
+    await expect(send(client, sender, signer(sender))).rejects.toBeInstanceOf(NonceReservationError);
+    expect(observed).toEqual([7]);
+
+    networkNonce = 8;
+    await expect(send(client, sender, signer(sender))).resolves.toMatchObject({ nonce: 8 });
+    expect(observed).toEqual([7, 8]);
+  });
+
+  it.each([0, 1])("advances after an async transaction finalizes with code %s", async (code) => {
+    const sender = "a".repeat(64);
+    const observed: Array<number | bigint> = [];
+    const client = new XianClient({ rpcUrl: "http://node", fetchFn: (async (input: string | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/abci_query") return nonceResponse(7);
+      if (url.pathname === "/tx") return jsonResponse({ result: { hash: "hash", tx_result: { code } } });
+      observed.push(decodeBroadcast(input).payload.nonce);
+      return acceptedResponse("hash");
+    }) as typeof fetch });
+
+    await expect(client.sendTx({ sender, signer: signer(sender), chainId: "chain-a",
+      contract: "currency", function: "transfer", kwargs: {}, chi: 100,
+      mode: "async", waitForTx: true
+    })).resolves.toMatchObject({ accepted: null, finalized: true, receipt: { success: code === 0 } });
+    await expect(send(client, sender, signer(sender))).resolves.toMatchObject({ nonce: 8 });
+    expect(observed).toEqual([7, 8]);
+  });
+
   it("reserves distinct nonces for concurrent sends", async () => {
     const sender = "a".repeat(64);
     const observed: Array<number | bigint> = [];

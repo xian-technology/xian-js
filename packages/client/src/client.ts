@@ -1269,6 +1269,8 @@ export class XianClient {
 
         if (!submission.submitted || submission.accepted === false) {
           await this.nonceReservations.reject(reservation);
+        } else if (submission.accepted == null && !submission.finalized) {
+          await this.nonceReservations.quarantine(reservation);
         } else {
           await this.nonceReservations.confirm(reservation);
         }

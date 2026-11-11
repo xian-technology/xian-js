@@ -205,6 +205,8 @@ Known pre-broadcast failures and structured RPC or CheckTx rejections release
 the automatic reservation. A thrown transport error or finalization timeout
 after broadcast is ambiguous, so the sender is quarantined from further
 automatic sends until `get_next_nonce` proves that the network advanced.
+An async broadcast acknowledgment also blocks further automatic sends until
+admission or finalization is established, because it has no CheckTx result.
 `NonceReservationError` identifies that state. After independently reconciling
 the transaction, a caller can deliberately clear it with:
 
