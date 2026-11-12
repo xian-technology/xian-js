@@ -181,6 +181,60 @@ describe("@xian-tech/provider permissions", () => {
     ).toBe("arguments mismatch");
   });
 
+  it("names the first scope check a request fails", () => {
+    const sendCall = (intent: Record<string, unknown>, method = "xian_sendCall") => ({
+      method,
+      params: [
+        method === "xian_sendCall"
+          ? { intent: { contract: "currency", function: "transfer", kwargs: {}, chi: 500, ...intent } }
+          : { tx: { payload: { contract: "currency", function: "transfer", kwargs: {}, chi_supplied: 500, ...intent } } }
+      ]
+    });
+    const policy = {
+      id: "policy-1",
+      origin: context.origin,
+      account: context.account,
+      chainId: context.chainId,
+      methods: ["xian_sendCall" as const],
+      contract: "currency",
+      function: "transfer",
+      maxChi: 500,
+      argumentScope: "any" as const,
+      createdAt: 1,
+      expiresAt: 2_000
+    };
+    const reason = (
+      request: ReturnType<typeof sendCall> | { method: string },
+      overrides: Record<string, unknown> = {},
+      ctx: Record<string, unknown> = {}
+    ) => evaluateXianDappPolicy({ ...policy, ...overrides }, { ...context, ...ctx }, request).reason;
+
+    expect(evaluateXianDappPolicy(policy, context, sendCall({})).matched).toBe(true);
+    expect(reason({ method: "xian_signMessage" })).toBe("request is not auto-approvable");
+    expect(reason(sendCall({}), {}, { now: 2_000 })).toBe("policy expired");
+    expect(reason(sendCall({}), { expiresAt: undefined }, { now: 9_999_999 })).toBeUndefined();
+    expect(reason(sendCall({}), {}, { origin: "https://evil.example" })).toBe("origin mismatch");
+    expect(reason(sendCall({}), {}, { account: "mallory" })).toBe("account mismatch");
+    expect(reason(sendCall({}), {}, { chainId: "xian-other" })).toBe("active chain mismatch");
+    expect(reason(sendCall({ chainId: "xian-other" }))).toBe("request chain mismatch");
+    expect(reason(sendCall({ chainId: "xian-local" }))).toBeUndefined();
+    expect(reason(sendCall({ sender: "mallory" }, "xian_sendTransaction"), {
+      methods: ["xian_sendTransaction"]
+    })).toBe("sender mismatch");
+    expect(reason(sendCall({ sender: "alice" }, "xian_sendTransaction"), {
+      methods: ["xian_sendTransaction"]
+    })).toBeUndefined();
+    expect(reason(sendCall({}, "xian_sendTransaction"))).toBe("method mismatch");
+    expect(reason(sendCall({ contract: "con_other" }))).toBe("contract mismatch");
+    expect(reason(sendCall({ contract: "con_other", function: "x" }), { contract: undefined, function: undefined }))
+      .toBeUndefined();
+    expect(reason(sendCall({ function: "approve" }))).toBe("function mismatch");
+    expect(reason(sendCall({}), { maxChi: undefined })).toBe("chi limit missing");
+    expect(reason(sendCall({}), { maxChi: 0 })).toBe("chi limit missing");
+    expect(reason(sendCall({ chi: undefined }))).toBe("chi limit exceeded");
+    expect(reason(sendCall({ chi: 501 }))).toBe("chi limit exceeded");
+  });
+
   it("supports explicit broad trusted dapp policies", () => {
     const request = {
       method: "xian_sendCall",
