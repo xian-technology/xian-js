@@ -281,6 +281,40 @@ export function parseXianDappAction(
   }
 }
 
+type PolicyScopeCheck = [
+  reason: string,
+  fails: (policy: XianDappPolicy, context: XianDappRequestContext, action: XianDappAction) => boolean
+];
+
+// Checked in order; the first failing check names why a policy does not apply.
+const POLICY_SCOPE_CHECKS: PolicyScopeCheck[] = [
+  ["policy expired", (policy, context) =>
+    policy.expiresAt != null && policy.expiresAt <= (context.now ?? Date.now())],
+  ["origin mismatch", (policy, context) => policy.origin !== context.origin],
+  ["account mismatch", (policy, context) => policy.account !== context.account],
+  ["active chain mismatch", (policy, context) => policy.chainId !== context.chainId],
+  ["request chain mismatch", (policy, _context, action) =>
+    Boolean(action.chainId) && action.chainId !== policy.chainId],
+  ["sender mismatch", (policy, _context, action) =>
+    Boolean(action.sender) && action.sender !== policy.account],
+  ["method mismatch", (policy, _context, action) => !policy.methods.includes(action.method)],
+  ["contract mismatch", (policy, _context, action) =>
+    Boolean(policy.contract) && action.contract !== policy.contract],
+  ["function mismatch", (policy, _context, action) =>
+    Boolean(policy.function) && action.function !== policy.function],
+  // A stored policy without a positive limit would approve unbounded fees.
+  ["chi limit missing", (policy) => {
+    const limit = normalizeNumber(policy.maxChi);
+    return limit == null || limit <= 0n;
+  }],
+  ["chi limit exceeded", (policy, _context, action) => {
+    const limit = normalizeNumber(policy.maxChi);
+    const actionChi = normalizeNumber(action.chi);
+    return limit == null || actionChi == null || actionChi > limit;
+  }],
+  ["arguments mismatch", (policy, _context, action) => !policyArgumentsMatch(policy, action.kwargs)]
+];
+
 export function evaluateXianDappPolicy(
   policy: XianDappPolicy,
   context: XianDappRequestContext,
@@ -291,44 +325,9 @@ export function evaluateXianDappPolicy(
     return { matched: false, reason: "request is not auto-approvable" };
   }
 
-  if (policy.expiresAt != null && policy.expiresAt <= (context.now ?? Date.now())) {
-    return { matched: false, action, reason: "policy expired" };
-  }
-  if (policy.origin !== context.origin) {
-    return { matched: false, action, reason: "origin mismatch" };
-  }
-  if (policy.account !== context.account) {
-    return { matched: false, action, reason: "account mismatch" };
-  }
-  if (policy.chainId !== context.chainId) {
-    return { matched: false, action, reason: "active chain mismatch" };
-  }
-  if (action.chainId && action.chainId !== policy.chainId) {
-    return { matched: false, action, reason: "request chain mismatch" };
-  }
-  if (action.sender && action.sender !== policy.account) {
-    return { matched: false, action, reason: "sender mismatch" };
-  }
-  if (!policy.methods.includes(action.method)) {
-    return { matched: false, action, reason: "method mismatch" };
-  }
-  if (policy.contract && action.contract !== policy.contract) {
-    return { matched: false, action, reason: "contract mismatch" };
-  }
-  if (policy.function && action.function !== policy.function) {
-    return { matched: false, action, reason: "function mismatch" };
-  }
-  // A stored policy without a positive limit would approve unbounded fees.
-  const policyChi = normalizeNumber(policy.maxChi);
-  if (policyChi == null || policyChi <= 0n) {
-    return { matched: false, action, reason: "chi limit missing" };
-  }
-  const actionChi = normalizeNumber(action.chi);
-  if (actionChi == null || actionChi > policyChi) {
-    return { matched: false, action, reason: "chi limit exceeded" };
-  }
-  if (!policyArgumentsMatch(policy, action.kwargs)) {
-    return { matched: false, action, reason: "arguments mismatch" };
+  const failed = POLICY_SCOPE_CHECKS.find(([, fails]) => fails(policy, context, action));
+  if (failed) {
+    return { matched: false, action, reason: failed[0] };
   }
 
   return { matched: true, policy, action };

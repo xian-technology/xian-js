@@ -79,9 +79,11 @@ export function parseBroadcastResponse(
   }
   if ("error" in data) return submission;
   if (mode === "commit") return { ...submission, ...commitOutcome(response) };
-  if (mode === "checktx") {
-    submission.accepted = response.code === 0;
-    submission.message = submission.accepted ? undefined : response.log ?? "CheckTx failed";
-  }
+  if (mode === "checktx") return { ...submission, ...checkTxOutcome(response) };
   return submission;
+}
+
+function checkTxOutcome(response: Record<string, unknown>): Pick<TransactionSubmission, "accepted" | "message"> {
+  const accepted = response.code === 0;
+  return { accepted, message: accepted ? undefined : response.log ?? "CheckTx failed" };
 }
