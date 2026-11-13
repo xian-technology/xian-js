@@ -4,8 +4,10 @@ import {
   assertSendCallSucceeded,
   connectWallet,
   getInjectedWallet,
+  OUT_OF_CHI_MESSAGE,
   sendCall,
   sendCallFailureMessage,
+  txFailureText,
   type SendCallResult
 } from "../src/index";
 import {
@@ -127,5 +129,41 @@ describe("@xian-tech/web-kit wallet helpers", () => {
     expect(() => assertSendCallSucceeded(failedReceipt)).toThrow(
       "contract assertion failed"
     );
+  });
+
+  it("reports each unsettled outcome with the node message or a default", () => {
+    const cases: [SendCallResult, string | null][] = [
+      [{ submitted: true, accepted: false, message: "bad nonce" }, "bad nonce"],
+      [{ submitted: true, accepted: false }, "Transaction was rejected by the node"],
+      [{ submitted: false, message: "offline" }, "offline"],
+      [{ submitted: false }, "Transaction was not submitted"],
+      [{ submitted: true, accepted: true, finalized: false, message: "pending" }, "pending"],
+      [
+        { submitted: true, accepted: true, finalized: false },
+        "Transaction was not finalized before the timeout"
+      ],
+      [{ submitted: true, accepted: true, finalized: true, error: "wallet closed" }, "wallet closed"],
+      [{ submitted: true, accepted: true, finalized: true, error: "  " }, null],
+      [{ submitted: true, accepted: true, finalized: true, receipt: { success: true } }, null],
+      [{ submitted: true, accepted: true, finalized: true, receipt: { success: false } }, "Transaction failed"]
+    ];
+    for (const [result, message] of cases) {
+      expect(sendCallFailureMessage(result)).toBe(message);
+    }
+  });
+
+  it("explains an out-of-chi failure as a state change since the estimate", () => {
+    const outOfChi: SendCallResult = {
+      submitted: true,
+      accepted: true,
+      finalized: true,
+      receipt: { success: false, message: "VmExecutionError('Out of chi.')" }
+    };
+
+    expect(sendCallFailureMessage(outOfChi)).toBe(OUT_OF_CHI_MESSAGE);
+    expect(() => assertSendCallSucceeded(outOfChi)).toThrow(OUT_OF_CHI_MESSAGE);
+    expect(OUT_OF_CHI_MESSAGE).toMatch(/state changed since the estimate/);
+    expect(txFailureText("Out of chi.")).toBe(OUT_OF_CHI_MESSAGE);
+    expect(txFailureText("contract assertion failed")).toBe("contract assertion failed");
   });
 });

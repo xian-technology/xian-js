@@ -157,24 +157,35 @@ export async function sendCall(
   }) as Promise<SendCallResult>;
 }
 
+/**
+ * Transactions supply exactly their simulated chi. When the chain state
+ * changes between the estimate and execution (a pool moved, a recipient
+ * appeared), the transaction can run out of chi; the node reports
+ * "Out of chi.".
+ */
+export const OUT_OF_CHI_MESSAGE =
+  "Out of chi: the chain state changed since the estimate. Review the transaction and try again.";
+
+/** The user-facing text for a failed transaction's message. */
+export function txFailureText(message: string): string {
+  return /out of chi/i.test(message) ? OUT_OF_CHI_MESSAGE : message;
+}
+
+// A call that stopped before execution, checked in this order: the node's
+// message when it sent one, else the default text.
+const UNSETTLED_DEFAULTS: readonly (readonly ["accepted" | "submitted" | "finalized", string])[] = [
+  ["accepted", "Transaction was rejected by the node"],
+  ["submitted", "Transaction was not submitted"],
+  ["finalized", "Transaction was not finalized before the timeout"]
+];
+
 export function sendCallFailureMessage(result: SendCallResult): string | null {
   if (result.receipt?.success === false) {
-    return String(result.receipt.message ?? result.message ?? "Transaction failed");
+    return txFailureText(String(result.receipt.message ?? result.message ?? "Transaction failed"));
   }
-  if (result.accepted === false) {
-    return typeof result.message === "string"
-      ? result.message
-      : "Transaction was rejected by the node";
-  }
-  if (result.submitted === false) {
-    return typeof result.message === "string"
-      ? result.message
-      : "Transaction was not submitted";
-  }
-  if (result.finalized === false) {
-    return typeof result.message === "string"
-      ? result.message
-      : "Transaction was not finalized before the timeout";
+  const unsettled = UNSETTLED_DEFAULTS.find(([field]) => result[field] === false);
+  if (unsettled) {
+    return typeof result.message === "string" ? result.message : unsettled[1];
   }
   if (typeof result.error === "string" && result.error.trim()) {
     return result.error;
