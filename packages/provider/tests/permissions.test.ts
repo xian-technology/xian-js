@@ -210,6 +210,7 @@ describe("@xian-tech/provider permissions", () => {
     ) => evaluateXianDappPolicy({ ...policy, ...overrides }, { ...context, ...ctx }, request).reason;
 
     expect(evaluateXianDappPolicy(policy, context, sendCall({})).matched).toBe(true);
+    expect(evaluateXianDappPolicy(policy, context, { method: "xian_signMessage" }).matched).toBe(false);
     expect(reason({ method: "xian_signMessage" })).toBe("request is not auto-approvable");
     expect(reason(sendCall({}), {}, { now: 2_000 })).toBe("policy expired");
     expect(reason(sendCall({}), { expiresAt: undefined }, { now: 9_999_999 })).toBeUndefined();
@@ -233,6 +234,26 @@ describe("@xian-tech/provider permissions", () => {
     expect(reason(sendCall({}), { maxChi: 0 })).toBe("chi limit missing");
     expect(reason(sendCall({ chi: undefined }))).toBe("chi limit exceeded");
     expect(reason(sendCall({ chi: 501 }))).toBe("chi limit exceeded");
+  });
+
+  it("builds no policy from a request it cannot scope to a contract, function and chi", () => {
+    const build = (intent: Record<string, unknown>) =>
+      createXianDappPolicyForRequest({
+        id: "policy-1",
+        ...context,
+        now: 1_000,
+        request: {
+          method: "xian_sendCall",
+          params: [{ intent: { contract: "currency", function: "transfer", kwargs: {}, chi: 500, ...intent } }]
+        }
+      });
+
+    expect(build({})).not.toBeNull();
+    expect(build({ contract: undefined })).toBeNull();
+    expect(build({ contract: "  " })).toBeNull();
+    expect(build({ function: undefined })).toBeNull();
+    expect(build({ chi: undefined })).toBeNull();
+    expect(build({ chi: 0 })).toBeNull();
   });
 
   it("supports explicit broad trusted dapp policies", () => {
