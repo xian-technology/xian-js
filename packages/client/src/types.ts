@@ -1,4 +1,3 @@
-import type { ChiHeadroomOptions } from "./chi.js";
 import type { XianVmProfile } from "./numeric.js";
 import type {
   BroadcastMode,
@@ -18,7 +17,7 @@ export type {
   XianUnsignedTransaction
 } from "@xian-tech/types";
 
-export interface XianClientOptions extends ChiHeadroomOptions {
+export interface XianClientOptions {
   rpcUrl: string;
   /** Defaults to xian_vm_v2. Select xian_vm_v1 for archived V1 fixtures. */
   vmProfile?: XianVmProfile;
@@ -34,7 +33,7 @@ export interface XianClientOptions extends ChiHeadroomOptions {
   requestTimeoutMs?: number;
 }
 
-export interface BuildTxRequest extends ChiHeadroomOptions {
+export interface BuildTxRequest {
   sender: string;
   contract: string;
   function: string;
@@ -272,10 +271,8 @@ export interface WaitForTxOptions {
 }
 
 export interface EstimateChiResult {
-  /** Exact simulated chi_used. */
+  /** Simulated chi_used: the chi to supply. */
   estimated: number;
-  /** Chi to supply: the estimate plus the configured headroom. */
-  suggested: number;
   simulation: Record<string, unknown>;
 }
 

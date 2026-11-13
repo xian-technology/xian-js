@@ -21,7 +21,6 @@ import { isValidEd25519Signature } from "./ed25519.js";
 import { AbciError, RpcError, SimulationError, TransactionError, TransportError, TxTimeoutError } from "./errors.js";
 import { NonceReservationManager } from "./nonce-reservation.js";
 import { WatchApi } from "./watch.js";
-import { resolveChiHeadroom, suggestChiSupplied, type ChiHeadroomOptions } from "./chi.js";
 import type {
   BroadcastMode,
   BroadcastTxOptions,
@@ -377,7 +376,6 @@ export class XianClient {
   private readonly fetchFn: typeof fetch;
   private readonly requestTimeoutMs: number;
   private readonly nonceReservations = new NonceReservationManager();
-  private readonly chiHeadroom: Required<ChiHeadroomOptions>;
   private chainIdCache?: string;
 
   constructor(options: XianClientOptions) {
@@ -390,7 +388,6 @@ export class XianClient {
       ? stripTrailingSlash(options.dashboardUrl)
       : undefined;
     this.chainIdCache = options.chainId;
-    this.chiHeadroom = resolveChiHeadroom(options);
     this.fetchFn = options.fetchFn ?? globalThis.fetch.bind(globalThis);
     this.requestTimeoutMs =
       options.requestTimeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -986,19 +983,9 @@ export class XianClient {
     return simulation.result;
   }
 
-  async estimateChi(
-    request: SimulateRequest,
-    options: ChiHeadroomOptions = {}
-  ): Promise<EstimateChiResult> {
-    const headroom = resolveChiHeadroom(options, this.chiHeadroom);
+  async estimateChi(request: SimulateRequest): Promise<EstimateChiResult> {
     const simulation = await this.simulate(request);
-    const estimated = coerceChiEstimate(simulation.chi_used);
-
-    return {
-      estimated,
-      suggested: suggestChiSupplied(estimated, headroom),
-      simulation
-    };
+    return { estimated: coerceChiEstimate(simulation.chi_used), simulation };
   }
 
   async buildTx(request: BuildTxRequest): Promise<XianUnsignedTransaction> {
@@ -1007,16 +994,13 @@ export class XianClient {
     let chiSupplied = request.chiSupplied ?? request.chi;
 
     if (chiSupplied == null) {
-      const estimate = await this.estimateChi(
-        {
-          sender: request.sender,
-          contract: request.contract,
-          function: request.function,
-          kwargs: request.kwargs
-        },
-        { chiMargin: request.chiMargin, minChiHeadroom: request.minChiHeadroom }
-      );
-      chiSupplied = estimate.suggested;
+      const estimate = await this.estimateChi({
+        sender: request.sender,
+        contract: request.contract,
+        function: request.function,
+        kwargs: request.kwargs
+      });
+      chiSupplied = estimate.estimated;
     }
 
     const payload = sortKeysDeep({

@@ -146,7 +146,7 @@ app.innerHTML = `
           <label>Function<input id="tx-function" value="transfer" /></label>
         </div>
         <div class="field-row">
-          <label>Chi<input id="tx-chi" placeholder="auto (simulate + headroom)" /></label>
+          <label>Chi<input id="tx-chi" placeholder="auto (simulated)" /></label>
           <label>Mode
             <select id="tx-mode">
               <option value="checktx">checktx</option>

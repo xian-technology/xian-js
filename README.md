@@ -194,13 +194,13 @@ const submission = await client.token("currency").transfer({
 console.log(submission.txHash, submission.accepted, submission.finalized);
 ```
 
-Automatic chi supplies the simulated estimate plus headroom:
-`estimate + max(ceil(estimate * chiMargin), minChiHeadroom)`, with defaults
-`chiMargin = 0.05` and `minChiHeadroom = 10`. Simulated cost can drift before
-execution, and unused chi is refunded. Override the defaults per client
-(`new XianClient({ rpcUrl, chiMargin, minChiHeadroom })`) or per request; an
-explicit `chi` always wins. `estimateChi(...)` returns both the exact
-`estimated` value and the `suggested` supply. The Python SDK uses the same rule.
+Automatic chi supplies exactly the simulated `chi_used`, with no headroom:
+for the same chain state, execution charges what the simulation reports. An
+explicit `chi` always wins. `estimateChi(...)` returns that `estimated` value
+with the full `simulation`. If the state changes between the estimate and
+execution (for example a pool moved or a recipient was created), the
+transaction can run out of chi and fails with `Out of chi.`; estimate again
+and resubmit. The Python SDK uses the same rule.
 
 Automatic sends reserve nonces per `XianClient`, chain, and sender. Concurrent
 `sendTx(...)` calls (including contract and token convenience helpers) therefore

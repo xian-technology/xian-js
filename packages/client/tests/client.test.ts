@@ -221,7 +221,7 @@ describe("@xian-tech/client", () => {
     ).rejects.toThrow(/source must be a non-empty string/);
   });
 
-  it("adds default headroom to simulated chi when building without manual chi", async () => {
+  it("supplies the simulated chi when building without manual chi", async () => {
     const signer = new Ed25519Signer("2".repeat(64));
     const fetchFn = vi.fn(async (input: string | URL) => {
       const url = String(input);
@@ -258,8 +258,7 @@ describe("@xian-tech/client", () => {
       nonce: 1
     });
 
-    // 12_000 + max(ceil(5%), 10); unused chi is refunded after execution.
-    expect(tx.payload.chi_supplied).toBe(12_600);
+    expect(tx.payload.chi_supplied).toBe(12_000);
   });
 
   it("rejects transaction kwargs floats before signing", async () => {

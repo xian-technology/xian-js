@@ -43,12 +43,6 @@ export {
   XianClientError
 } from "./errors.js";
 export { WatchApi } from "./watch.js";
-export {
-  DEFAULT_CHI_MARGIN,
-  DEFAULT_MIN_CHI_HEADROOM,
-  suggestChiSupplied,
-  type ChiHeadroomOptions
-} from "./chi.js";
 export type * from "./types.js";
 
 export { prepareTransaction, type PreparedTransaction } from "./transaction.js";
