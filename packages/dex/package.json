@@ -42,7 +42,8 @@
     "access": "public"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ],
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
@@ -51,5 +52,6 @@
   },
   "dependencies": {
     "@xian-tech/types": "0.3.3"
-  }
+  },
+  "license": "MIT"
 }

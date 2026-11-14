@@ -19,7 +19,8 @@
     "access": "public"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -27,5 +28,6 @@
   },
   "dependencies": {
     "@xian-tech/types": "0.3.3"
-  }
+  },
+  "license": "MIT"
 }
