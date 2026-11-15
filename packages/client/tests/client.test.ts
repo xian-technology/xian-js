@@ -258,7 +258,7 @@ describe("@xian-tech/client", () => {
       nonce: 1
     });
 
-    expect(tx.payload.chi_supplied).toBe(12_000);
+    expect(tx.payload.chi_supplied).toBe(12_002);
   });
 
   it("rejects transaction kwargs floats before signing", async () => {

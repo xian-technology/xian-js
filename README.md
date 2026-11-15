@@ -194,13 +194,17 @@ const submission = await client.token("currency").transfer({
 console.log(submission.txHash, submission.accepted, submission.finalized);
 ```
 
-Automatic chi supplies exactly the simulated `chi_used`, with no headroom:
-for the same chain state, execution charges what the simulation reports. An
-explicit `chi` always wins. `estimateChi(...)` returns that `estimated` value
-with the full `simulation`. If the state changes between the estimate and
-execution (for example a pool moved or a recipient was created), the
-transaction can run out of chi and fails with `Out of chi.`; estimate again
-and resubmit. The Python SDK uses the same rule.
+`estimateChi(...)` returns the simulated `estimated` chi with the full
+`simulation`. `chiToSupply(estimated)` turns it into the chi to supply: the
+estimate plus `CHI_ESTIMATE_MARGIN` (2 chi), never more than the chain's
+per-transaction cap `MAX_TX_CHI` (200,000); an estimate above the cap throws
+`TransactionError`. Automatic chi uses the same rule, and an explicit `chi`
+always wins unchanged. The margin covers a transaction that lands between the
+estimate and execution and grows a stored value by a byte, which costs one chi
+more; execution charges only the chi used, so the margin costs nothing. If the
+state changes more than that (for example a pool moved or a recipient was
+created), the transaction can still run out of chi and fails with
+`Out of chi.`; estimate again and resubmit. The Python SDK uses the same rule.
 
 Automatic sends reserve nonces per `XianClient`, chain, and sender. Concurrent
 `sendTx(...)` calls (including contract and token convenience helpers) therefore

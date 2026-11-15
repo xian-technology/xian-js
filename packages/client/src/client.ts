@@ -17,6 +17,7 @@ import {
   sortKeysDeep,
   utf8ToBytes
 } from "./encoding.js";
+import { chiToSupply } from "./chi.js";
 import { isValidEd25519Signature } from "./ed25519.js";
 import { AbciError, RpcError, SimulationError, TransactionError, TransportError, TxTimeoutError } from "./errors.js";
 import { NonceReservationManager } from "./nonce-reservation.js";
@@ -1000,7 +1001,7 @@ export class XianClient {
         function: request.function,
         kwargs: request.kwargs
       });
-      chiSupplied = estimate.estimated;
+      chiSupplied = chiToSupply(estimate.estimated);
     }
 
     const payload = sortKeysDeep({

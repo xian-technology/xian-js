@@ -14,7 +14,8 @@ apps do not re-implement the same wallet/RPC plumbing.
   `useXianWallet`, `connectWallet`, `sendCall`). `sendCallFailureMessage`
   and `assertSendCallSucceeded` turn a failed call into user-facing text;
   `txFailureText` explains an `Out of chi.` failure as a chain-state change
-  since the estimate (transactions supply exactly their simulated chi).
+  since the estimate (transactions supply their simulated chi plus a 2-chi
+  margin).
 - `src/rpc.ts`, `src/rpc-react.ts`: RPC client creation and persisted
   RPC-endpoint stores (`createXianRpcStore`).
 - `src/toast-react.tsx`: toast provider and helpers.

@@ -43,19 +43,21 @@ must use the explicit artifact APIs:
 - `getContractSource(contract)` for canonical contract source
 - `getContractIr(contract)` for Xian VM IR
 
-Automatic chi supplies exactly the simulated `chi_used`. The chi headroom
+Automatic chi supplies the simulated `chi_used` plus a fixed
+`CHI_ESTIMATE_MARGIN` of 2 chi, capped at `MAX_TX_CHI` (200,000), through the
+new `chiToSupply(estimated)` helper. The old configurable chi headroom
 rule is removed: `suggestChiSupplied`, `DEFAULT_CHI_MARGIN`,
 `DEFAULT_MIN_CHI_HEADROOM`, the `ChiHeadroomOptions` type, the
 `chiMargin`/`minChiHeadroom` client and `buildTx` options, the `estimateChi`
 options argument and the `suggested` field of `EstimateChiResult`. Callers
-supply `estimated` (or let `buildTx`/`sendTx` estimate).
+supply `chiToSupply(estimated)` (or let `buildTx`/`sendTx` estimate).
 
 Release checklist:
 
 - tag as the next breaking pre-1.0 version, for example `v0.2.0`
 - update every publishable package version to the tag version before tagging
-- call out the removed `getContract(...)` alias and the removed chi headroom
-  API in release notes
+- call out the removed `getContract(...)` alias, the removed chi headroom
+  API and the fixed 2-chi estimate margin (`chiToSupply`) in release notes
 - update downstream examples and wallet dependencies before publishing
 
 ## Tag Workflow

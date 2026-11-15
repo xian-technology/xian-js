@@ -271,7 +271,7 @@ export interface WaitForTxOptions {
 }
 
 export interface EstimateChiResult {
-  /** Simulated chi_used: the chi to supply. */
+  /** Simulated chi_used; `chiToSupply(estimated)` is the chi to supply. */
   estimated: number;
   simulation: Record<string, unknown>;
 }

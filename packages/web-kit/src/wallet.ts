@@ -158,10 +158,10 @@ export async function sendCall(
 }
 
 /**
- * Transactions supply exactly their simulated chi. When the chain state
- * changes between the estimate and execution (a pool moved, a recipient
- * appeared), the transaction can run out of chi; the node reports
- * "Out of chi.".
+ * Transactions supply their simulated chi plus a small margin
+ * (`chiToSupply`). When the chain state changes more than that between the
+ * estimate and execution (a pool moved, a recipient appeared), the
+ * transaction can run out of chi; the node reports "Out of chi.".
  */
 export const OUT_OF_CHI_MESSAGE =
   "Out of chi: the chain state changed since the estimate. Review the transaction and try again.";
