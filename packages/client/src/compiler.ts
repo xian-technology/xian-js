@@ -9,7 +9,6 @@ interface CompileContractArtifactsOptions {
   moduleName: string;
   source: string;
   compiler?: XianContractCompiler;
-  lint?: boolean;
   vmProfile?: string;
 }
 
@@ -17,8 +16,8 @@ interface XianCompilerModule extends XianContractCompiler {}
 
 const DEFAULT_COMPILER_MODULE = "@xian-tech/compiler";
 
-function compilerOptionsJson(vmProfile: string, lint: boolean): string {
-  return JSON.stringify({ lint, vm_profile: vmProfile });
+function compilerOptionsJson(vmProfile: string): string {
+  return JSON.stringify({ vm_profile: vmProfile });
 }
 
 async function loadDefaultCompiler(): Promise<XianCompilerModule> {
@@ -49,11 +48,9 @@ export async function compileContractArtifacts(
 ): Promise<ContractDeploymentArtifacts> {
   const compiler = options.compiler ?? (await loadDefaultCompiler());
   const vmProfile = options.vmProfile ?? DEFAULT_VM_PROFILE;
-  const lint = options.lint ?? true;
 
   if (typeof compiler.compileContractArtifact === "function") {
     return compiler.compileContractArtifact(options.moduleName, options.source, {
-      lint,
       vmProfile
     });
   }
@@ -62,7 +59,7 @@ export async function compileContractArtifacts(
     const artifactJson = await compiler.compileContractArtifactJson(
       options.moduleName,
       options.source,
-      compilerOptionsJson(vmProfile, lint)
+      compilerOptionsJson(vmProfile)
     );
     return parseArtifactJson(artifactJson);
   }

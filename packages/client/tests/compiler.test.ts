@@ -35,7 +35,7 @@ describe("contract compiler bridge", () => {
     expect(compiler.compileContractArtifactJson).toHaveBeenCalledWith(
       "con_counter",
       "counter = Variable()\n",
-      JSON.stringify({ lint: true, vm_profile: "xian_vm_v2" })
+      JSON.stringify({ vm_profile: "xian_vm_v2" })
     );
   });
 

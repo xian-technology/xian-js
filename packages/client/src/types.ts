@@ -72,7 +72,7 @@ export interface XianContractCompiler {
   compileContractArtifact?: (
     moduleName: string,
     source: string,
-    options?: { vmProfile?: string; lint?: boolean }
+    options?: { vmProfile?: string }
   ) => ContractDeploymentArtifacts | Promise<ContractDeploymentArtifacts>;
   compileContractArtifactJson?: (
     moduleName: string,
