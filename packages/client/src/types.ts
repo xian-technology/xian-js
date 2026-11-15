@@ -88,6 +88,12 @@ export interface SimulateRequest {
   contract: string;
   function: string;
   kwargs: Record<string, unknown>;
+  /**
+   * The nonce the transaction will be signed with: its digits are bytes the
+   * transaction pays for. Without it the node sizes the envelope with the
+   * sender's committed next nonce, which ignores pending transactions.
+   */
+  nonce?: XianNumber;
 }
 
 export interface XianAbciQueryOptions {

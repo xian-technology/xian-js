@@ -329,6 +329,15 @@ function clampOffset(value: number | undefined): number {
   return Math.max(0, Math.trunc(value));
 }
 
+/** A simulation whose call failed describes a transaction that fails. */
+function requireExecuted(simulation: Record<string, unknown>): Record<string, unknown> {
+  const status = simulation.status;
+  if (status != null && status !== 0) {
+    throw new SimulationError(String(simulation.result ?? "Simulation failed"), simulation);
+  }
+  return simulation;
+}
+
 function isPendingLookupReceipt(receipt: TransactionReceipt): boolean {
   return !receipt.success && receipt.txHash == null && receipt.transaction == null;
 }
@@ -958,15 +967,13 @@ export class XianClient {
       contract: request.contract,
       function: request.function,
       kwargs: request.kwargs,
-      sender: request.sender
+      sender: request.sender,
+      ...(request.nonce == null ? {} : { nonce: request.nonce })
     });
     const encoded = bytesToHex(utf8ToBytes(encodeRuntime(payload, this.vmProfile)));
     const data = await this.abciQuery(`/simulate_tx/${encoded}`);
+    // abciQuery has already refused a nonzero response code.
     const response = asRecord(asRecord(data.result).response);
-    if (response.code != null && response.code !== 0) {
-      throw new SimulationError(String(response.log ?? "simulation failed"), response);
-    }
-
     const rawValue = response.value;
     const decoded = rawValue == null ? null : decodeRuntime<Record<string, unknown>>(base64ToUtf8(String(rawValue)), this.vmProfile);
     if (decoded == null) {
@@ -976,12 +983,7 @@ export class XianClient {
   }
 
   async call(request: SimulateRequest): Promise<unknown> {
-    const simulation = await this.simulate(request);
-    const status = simulation.status;
-    if (status != null && status !== 0) {
-      throw new SimulationError(String(simulation.result ?? "Simulation failed"), simulation);
-    }
-    return simulation.result;
+    return requireExecuted(await this.simulate(request)).result;
   }
 
   async estimateChi(request: SimulateRequest): Promise<EstimateChiResult> {
@@ -995,12 +997,16 @@ export class XianClient {
     let chiSupplied = request.chiSupplied ?? request.chi;
 
     if (chiSupplied == null) {
+      // Exactly the simulated chi of the signed envelope, for a call whose
+      // simulation succeeds: a failed one would fail on chain and pay its fee.
       const estimate = await this.estimateChi({
         sender: request.sender,
         contract: request.contract,
         function: request.function,
-        kwargs: request.kwargs
+        kwargs: request.kwargs,
+        nonce
       });
+      requireExecuted(estimate.simulation);
       chiSupplied = chiToSupply(estimate.estimated);
     }
 

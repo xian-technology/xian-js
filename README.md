@@ -204,7 +204,12 @@ estimate and execution and grows a stored value by a byte, which costs one chi
 more; execution charges only the chi used, so the margin costs nothing. If the
 state changes more than that (for example a pool moved or a recipient was
 created), the transaction can still run out of chi and fails with
-`Out of chi.`; estimate again and resubmit. The Python SDK uses the same rule.
+`Out of chi.`; estimate again and resubmit. Automatic chi simulates with the
+nonce the transaction is signed with (`estimateChi({ ..., nonce })`; its
+digits are bytes the transaction pays for) and throws `SimulationError`,
+carrying the simulation's error text, instead of building a call whose
+simulation failed, which would fail on chain and pay its fee. The Python SDK
+uses the same rule.
 
 Automatic sends reserve nonces per `XianClient`, chain, and sender. Concurrent
 `sendTx(...)` calls (including contract and token convenience helpers) therefore

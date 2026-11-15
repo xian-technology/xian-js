@@ -4,21 +4,29 @@ import {
   CHI_ESTIMATE_MARGIN,
   Ed25519Signer,
   MAX_TX_CHI,
+  SimulationError,
   TransactionError,
   XianClient,
   chiToSupply
 } from "../src/index";
 
-function simulationFetch(chiUsed: number): typeof fetch {
+function simulationFetch(chiUsed: number, status = 0, result = "ok"): typeof fetch {
   return vi.fn(async (input: string | URL) => {
     const url = String(input);
     if (!url.includes("simulate_tx")) throw new Error(`unexpected URL: ${url}`);
-    const value = btoa(JSON.stringify({ status: 0, result: "ok", chi_used: chiUsed }));
+    const value = btoa(JSON.stringify({ status, result, chi_used: chiUsed }));
     return new Response(JSON.stringify({ result: { response: { code: 0, value } } }), {
       status: 200,
       headers: { "content-type": "application/json" }
     });
   }) as typeof fetch;
+}
+
+/** The JSON payload a simulate_tx query carried. */
+function simulatedPayload(fetchFn: typeof fetch): Record<string, unknown> {
+  const url = String(vi.mocked(fetchFn).mock.calls[0]![0]);
+  const hex = decodeURIComponent(url).match(/simulate_tx\/([0-9a-f]+)/)![1]!;
+  return JSON.parse(Buffer.from(hex, "hex").toString("utf8"));
 }
 
 const signer = new Ed25519Signer("2".repeat(64));
@@ -78,5 +86,43 @@ describe("automatic chi", () => {
       fetchFn: simulationFetch(MAX_TX_CHI + 1)
     });
     await expect(client.buildTx(request)).rejects.toThrow(TransactionError);
+  });
+
+  it("simulates with the nonce the transaction is signed with", async () => {
+    // The node sizes the estimated envelope with the payload's nonce, else
+    // its committed next nonce, which ignores this sender's pending
+    // transactions: 9 committed and 10 pending makes the envelope a byte longer.
+    const fetchFn = simulationFetch(77);
+    const client = new XianClient({ rpcUrl: "http://127.0.0.1:1", chainId: "xian-local", fetchFn });
+    await client.buildTx({ ...request, nonce: 10 });
+    expect(simulatedPayload(fetchFn).nonce).toBe(10);
+  });
+
+  it.each([
+    [23, "AssertionError: Not enough coins to send!"],
+    [200_000, "Out of chi."],
+    [0, "Simulation capacity exceeded on this node; retry later"]
+  ])("refuses a call whose simulation failed (chi_used %i)", async (chiUsed, result) => {
+    // A failed dry run describes a transaction that fails on chain and pays
+    // its fee (or one CheckTx rejects for supplying 0 chi).
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:1",
+      chainId: "xian-local",
+      fetchFn: simulationFetch(chiUsed, 1, result)
+    });
+    const attempt = client.buildTx(request);
+    await expect(attempt).rejects.toBeInstanceOf(SimulationError);
+    await expect(attempt).rejects.toThrow(result);
+  });
+
+  it("refuses a simulation answer that is not a JSON object", async () => {
+    const fetchFn = vi.fn(async () =>
+      new Response(JSON.stringify({ result: { response: { code: 0, value: btoa("not json") } } }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      })
+    ) as typeof fetch;
+    const client = new XianClient({ rpcUrl: "http://127.0.0.1:1", fetchFn });
+    await expect(client.simulate(request)).rejects.toThrow("did not decode");
   });
 });
