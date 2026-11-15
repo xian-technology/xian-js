@@ -598,4 +598,69 @@ describe("durable prepared transaction observer", () => {
     await send(client, sender, signer(sender));
     expect(nonces).toEqual([7]);
   });
+
+  // CometBFT answers a broadcast its mempool refused with HTTP 500 and a
+  // JSON-RPC error body (rpc/jsonrpc/server/http_uri_handler.go).
+  function rpcRefusal(data: string): Response {
+    return new Response(
+      JSON.stringify({ jsonrpc: "2.0", id: -1, error: { code: -32603, message: "Internal error", data } }),
+      { status: 500, headers: { "content-type": "application/json" } }
+    );
+  }
+
+  it.each([
+    "endpoint is closed while node is catching up",
+    "mempool is full: number of txs 5000 (max: 5000), total txs bytes 1 (max: 1073741824)"
+  ])("releases the automatic nonce after a node refusal: %s", async (refusal) => {
+    const sender = "a".repeat(64);
+    const observed: Array<number | bigint> = [];
+    const client = new XianClient({ rpcUrl: "http://node", fetchFn: (async (input: string | URL) => {
+      if (String(input).includes("abci_query")) return nonceResponse(7);
+      observed.push(decodeBroadcast(input).payload.nonce);
+      return observed.length === 1 ? rpcRefusal(refusal) : acceptedResponse("hash");
+    }) as typeof fetch });
+
+    await expect(send(client, sender, signer(sender))).resolves.toMatchObject({
+      submitted: false, accepted: null, finalized: false, nonce: 7, message: refusal
+    });
+    await expect(send(client, sender, signer(sender))).resolves.toMatchObject({ accepted: true, nonce: 7 });
+    expect(observed).toEqual([7, 7]);
+  });
+
+  it("reports a duplicate refused with HTTP 500 as unresolved", async () => {
+    const sender = "a".repeat(64);
+    const client = new XianClient({ rpcUrl: "http://node", fetchFn: (async (input: string | URL) =>
+      String(input).includes("abci_query") ? nonceResponse(7) : rpcRefusal("tx already exists in cache")
+    ) as typeof fetch });
+
+    await expect(send(client, sender, signer(sender))).resolves.toMatchObject({
+      submitted: true, accepted: null, finalized: false, nonce: 7
+    });
+    await expect(send(client, sender, signer(sender))).rejects.toBeInstanceOf(NonceReservationError);
+  });
+
+  it("still treats a non-JSON-RPC HTTP failure as a lost response", async () => {
+    const sender = "a".repeat(64);
+    const client = new XianClient({ rpcUrl: "http://node", fetchFn: (async (input: string | URL) =>
+      String(input).includes("abci_query") ? nonceResponse(7) : new Response("bad gateway", { status: 502 })
+    ) as typeof fetch });
+
+    await expect(send(client, sender, signer(sender))).rejects.toBeInstanceOf(TransportError);
+    await expect(send(client, sender, signer(sender))).rejects.toBeInstanceOf(NonceReservationError);
+  });
+
+  it("keeps a commit-mode error, which can follow admission, unresolved", async () => {
+    const sender = "a".repeat(64);
+    const client = new XianClient({ rpcUrl: "http://node", fetchFn: (async (input: string | URL) =>
+      String(input).includes("abci_query")
+        ? nonceResponse(7)
+        : rpcRefusal("timed out waiting for tx to be included in a block")
+    ) as typeof fetch });
+
+    await expect(client.sendTx({ sender, signer: signer(sender), chainId: "chain-a",
+      contract: "currency", function: "transfer", kwargs: {}, chi: 100, mode: "commit"
+    })).rejects.toBeInstanceOf(TransportError);
+    await expect(send(client, sender, signer(sender))).rejects.toBeInstanceOf(NonceReservationError);
+  });
 });
+

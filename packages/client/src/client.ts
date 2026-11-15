@@ -1,4 +1,4 @@
-import { fetchResponse, readJsonResponse, withRequestDeadline } from "./transport.js";
+import { fetchResponse, readJsonResponse, readRpcErrorAnswer, withRequestDeadline } from "./transport.js";
 import { BROADCAST_ENDPOINTS, duplicateTxMessage, parseBroadcastResponse } from "./broadcast.js";
 import { asRecord, readErrorMessage } from "./rpc-response.js";
 import { DEFAULT_VM_PROFILE, fixed, parseInteger, type XianVmProfile } from "./numeric.js";
@@ -410,7 +410,7 @@ export class XianClient {
   private async requestJson(
     method: "GET" | "POST",
     url: string,
-    options?: { signal?: AbortSignal; timeoutMs?: number }
+    options?: { signal?: AbortSignal; timeoutMs?: number; rpcErrorAnswers?: boolean }
   ): Promise<Record<string, unknown>> {
     return withRequestDeadline(async (signal) => {
       const response = await fetchResponse(this.fetchFn, url, {
@@ -418,10 +418,14 @@ export class XianClient {
         headers: method === "POST" ? { "content-type": "application/json" } : undefined,
         signal
       });
-      if (!response.ok) {
+      if (response.ok) {
+        return readJsonResponse(response, url, signal);
+      }
+      const answer = options?.rpcErrorAnswers ? await readRpcErrorAnswer(response) : undefined;
+      if (answer === undefined) {
         throw new TransportError(`${method} ${url} returned ${response.status}`);
       }
-      return readJsonResponse(response, url, signal);
+      return answer;
     }, {
       timeoutMs: options?.timeoutMs ?? this.requestTimeoutMs,
       signal: options?.signal,
@@ -1059,7 +1063,9 @@ export class XianClient {
     const url = new URL(`${this.rpcUrl}/${BROADCAST_ENDPOINTS[mode]}`);
     url.searchParams.set("tx", `"${prepared.rpcHex}"`);
 
-    const data = await this.requestJson("POST", url.toString());
+    // A sync/async refusal is the node's answer; a commit error can come
+    // after admission (inclusion timeout), so it stays a lost response.
+    const data = await this.requestJson("POST", url.toString(), { rpcErrorAnswers: mode !== "commit" });
     const submission = parseBroadcastResponse(tx, mode, data, prepared.txHash);
     return duplicateTxMessage(data) === undefined
       ? this.finalizeBroadcast(submission, options)

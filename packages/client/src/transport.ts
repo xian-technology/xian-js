@@ -97,6 +97,23 @@ export async function fetchResponse(
   }
 }
 
+/**
+ * The JSON-RPC error answer in an HTTP error response, if its body is one:
+ * CometBFT sends a refused broadcast (mempool full, catching up, duplicate
+ * in cache) with HTTP 500 and a JSON-RPC error body.
+ */
+export async function readRpcErrorAnswer(
+  response: Response
+): Promise<Record<string, unknown> | undefined> {
+  try {
+    const body: unknown = await response.json();
+    const error = (body as { error?: unknown } | null)?.error;
+    return typeof error === "object" && error !== null ? (body as Record<string, unknown>) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function readJsonResponse(
   response: Response, url: string, signal: AbortSignal | undefined
 ): Promise<Record<string, unknown>> {

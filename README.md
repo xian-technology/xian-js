@@ -219,7 +219,9 @@ sequential nonces. Different senders and chains remain concurrent. Supplying
 snapshot operation that does not hold a reservation.
 
 Known pre-broadcast failures and structured RPC or CheckTx rejections release
-the automatic reservation. A thrown transport error or finalization timeout
+the automatic reservation (CometBFT sends a sync/async refusal such as
+"mempool is full" or "endpoint is closed while node is catching up" with HTTP
+500 and a JSON-RPC error body; that body is the node's answer). A thrown transport error or finalization timeout
 after broadcast is ambiguous, so the sender is quarantined from further
 automatic sends until `get_next_nonce` proves that the network advanced.
 An async broadcast acknowledgment also blocks further automatic sends until
