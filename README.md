@@ -194,6 +194,12 @@ const submission = await client.token("currency").transfer({
 console.log(submission.txHash, submission.accepted, submission.finalized);
 ```
 
+`normalizeXianRecipient(text)` trims a simple-send recipient and canonicalizes
+64-hex public keys to lowercase. Named recipients retain their spelling.
+Wallets apply it before review: account balance keys are case-sensitive and
+transaction senders require canonical lowercase keys. Generic contract-call
+kwargs are preserved exactly.
+
 `estimateChi(...)` returns the simulated `estimated` chi with the full
 `simulation`. `chiToSupply(estimated)` turns it into the chi to supply: the
 estimate plus `CHI_ESTIMATE_MARGIN` (2 chi), never more than the chain's

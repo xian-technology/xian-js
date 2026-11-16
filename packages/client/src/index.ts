@@ -1,4 +1,5 @@
 export { CHI_ESTIMATE_MARGIN, MAX_TX_CHI, chiToSupply } from "./chi.js";
+export { normalizeXianRecipient } from "./recipient.js";
 export { compileContractArtifacts } from "./compiler.js";
 export { XianClient, ContractClient, TokenClient } from "./client.js";
 export {
