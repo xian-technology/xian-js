@@ -545,10 +545,12 @@ export class XianClient {
       return this.chainIdCache;
     }
 
-    const genesis = await this.getGenesis();
-    const chainId = asRecord(asRecord(genesis.result).genesis).chain_id;
+    // /status names the chain the node runs; /genesis would too, but CometBFT
+    // refuses that document above 16 MiB, which migrated balances can reach.
+    const status = await this.getStatus();
+    const chainId = asRecord(asRecord(status.result).node_info).network;
     if (typeof chainId !== "string" || chainId.length === 0) {
-      throw new RpcError("genesis response did not include chain_id", genesis);
+      throw new RpcError("node status did not include node_info.network", status);
     }
 
     this.chainIdCache = chainId;

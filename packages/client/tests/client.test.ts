@@ -28,14 +28,8 @@ describe("@xian-tech/client", () => {
   it("reads chain id and nonce through RPC surfaces", async () => {
     const fetchFn = vi.fn(async (input: string | URL) => {
       const url = String(input);
-      if (url.endsWith("/genesis")) {
-        return jsonResponse({
-          result: {
-            genesis: {
-              chain_id: "xian-local"
-            }
-          }
-        });
+      if (url.endsWith("/status")) {
+        return jsonResponse({ result: { node_info: { network: "xian-local" } } });
       }
       if (url.includes("/abci_query") && url.includes("get_next_nonce")) {
         return jsonResponse({
@@ -59,18 +53,46 @@ describe("@xian-tech/client", () => {
     await expect(client.getNonce("a".repeat(64))).resolves.toBe(7);
   });
 
+  // CometBFT refuses /genesis above 16 MiB (a genesis with migrated balances
+  // can reach that); /status names the chain the node runs.
+  it("reads the chain id from /status, once, even when /genesis is too large", async () => {
+    const requests: string[] = [];
+    const fetchFn = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      requests.push(new URL(url).pathname);
+      if (url.endsWith("/genesis")) {
+        return new Response(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: -1,
+            error: {
+              code: -32603,
+              message: "Internal error",
+              data: "genesis response is large, please use the genesis_chunked API instead"
+            }
+          }),
+          { status: 500, headers: { "content-type": "application/json" } }
+        );
+      }
+      if (url.endsWith("/status")) {
+        return jsonResponse({ result: { node_info: { network: "xian-launch-1" } } });
+      }
+      throw new Error(`unexpected URL: ${url}`);
+    }) as typeof fetch;
+
+    const client = new XianClient({ rpcUrl: "http://127.0.0.1:26657", fetchFn });
+
+    await expect(client.getChainId()).resolves.toBe("xian-launch-1");
+    await expect(client.getChainId()).resolves.toBe("xian-launch-1");
+    expect(requests).toEqual(["/status"]);
+  });
+
   it("builds, signs, and broadcasts a checktx transaction", async () => {
     const signer = new Ed25519Signer("2".repeat(64));
     const fetchFn = vi.fn(async (input: string | URL) => {
       const url = String(input);
-      if (url.endsWith("/genesis")) {
-        return jsonResponse({
-          result: {
-            genesis: {
-              chain_id: "xian-local"
-            }
-          }
-        });
+      if (url.endsWith("/status")) {
+        return jsonResponse({ result: { node_info: { network: "xian-local" } } });
       }
       if (url.includes("/broadcast_tx_sync")) {
         return jsonResponse({
