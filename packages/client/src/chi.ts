@@ -4,8 +4,9 @@ import { TransactionError } from "./errors.js";
  * Chi added to the simulated estimate. A simulation is exact for the state it
  * ran on, but a transaction that lands between simulation and execution can
  * change that state: a stored value can grow by a byte, so execution can need
- * one chi more than the estimate and would fail with "Out of chi". Execution
- * charges only the chi it uses, so the margin costs the sender nothing.
+ * one chi more than the estimate and would fail with "Out of chi". A paid
+ * transaction pays half of the chi it leaves unused (rounded down), so the
+ * margin costs the sender at most one chi.
  */
 export const CHI_ESTIMATE_MARGIN = 2;
 
