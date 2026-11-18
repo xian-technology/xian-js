@@ -35,12 +35,13 @@ npm install
 npm run validate
 ```
 
-Build a transaction, sign it, and broadcast it:
+Use a funded local account in `XIAN_PRIVATE_KEY` and a recipient public key in
+`XIAN_RECIPIENT`. This Node.js example estimates chi, signs and waits for execution:
 
 ```ts
 import { Ed25519Signer, XianClient } from "@xian-tech/client";
 
-const signer = new Ed25519Signer();
+const signer = new Ed25519Signer(process.env.XIAN_PRIVATE_KEY!);
 const client = new XianClient({
   rpcUrl: "http://127.0.0.1:26657",
   dashboardUrl: "http://127.0.0.1:8080",
@@ -50,13 +51,12 @@ const tx = await client.buildTx({
   sender: signer.address,
   contract: "currency",
   function: "transfer",
-  kwargs: { to: "bob", amount: 5 },
-  chi: 50_000,
+  kwargs: { to: process.env.XIAN_RECIPIENT!, amount: 5 },
 });
 
 const signedTx = await client.signTx(tx, signer);
-const submission = await client.broadcastTx(signedTx, { mode: "checktx" });
-console.log(submission.txHash);
+const submission = await client.broadcastTx(signedTx, { mode: "checktx", waitForTx: true });
+console.log(submission.txHash, submission.receipt?.success);
 ```
 
 New clients, standalone wire helpers, offline transaction preparation and the compiler bridge use `xian_vm_v2` by default. Pass large integers as `bigint` and decimal
