@@ -300,7 +300,7 @@ describe("@xian-tech/client", () => {
         nonce: 1,
         chi: 50_000
       })
-    ).rejects.toThrow(/kwargs values/);
+    ).rejects.toThrow(/fixed\(text\)/);
   });
 
   it("rejects non-object transaction kwargs before signing", async () => {
@@ -1250,9 +1250,9 @@ it("preserves V2 simulated and persisted decimals through public reads", async (
       return jsonResponse({result:{response:{info:"decimal",value:btoa("9007199254740993")}}});
     }) as typeof fetch,
   });
-  await expect(client.call({sender:"alice",contract:"token",function:"get",kwargs:{amount:{__fixed__:amount}}})).resolves.toBe(amount);
+  await expect(client.call({sender:"alice",contract:"token",function:"get",kwargs:{amount:{__fixed__:amount}}})).resolves.toEqual({__fixed__:amount});
   expect(JSON.parse(captured).kwargs.amount).toEqual({__fixed__:amount});
-  await expect(client.getState("token","amount")).resolves.toBe("9007199254740993");
+  await expect(client.getState("token","amount")).resolves.toEqual({__fixed__:"9007199254740993"});
 });
 
 it("reads operator telemetry as ordinary JSON on V2", async () => {
@@ -1276,7 +1276,7 @@ it("uses exact storage balance after a contract-level balance_of error", async (
       return jsonResponse({ result: { response } });
     }
   });
-  await expect(client.getBalance("alice")).resolves.toBe(balance);
+  await expect(client.getBalance("alice")).resolves.toEqual({__fixed__:balance});
 });
 
 it("decodes nested V2 contract numbers in a committed receipt", async () => {
@@ -1289,5 +1289,5 @@ it("decodes nested V2 contract numbers in a committed receipt", async () => {
     fetchFn: async () => jsonResponse({ result: { hash: "A", tx_result: { code: 0, data } } })
   });
   const receipt = await client.getTx("A");
-  expect(receipt.execution).toEqual({ result: [9007199254740993n, amount, "001.2"] });
+  expect(receipt.execution).toEqual({ result: [9007199254740993n, { __fixed__: amount }, "001.2"] });
 });

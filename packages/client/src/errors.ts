@@ -36,6 +36,8 @@ export class SimulationError extends XianClientError {
 
 export class TransactionError extends XianClientError {}
 
+export class TxNotFoundError extends TransactionError {}
+
 export class NonceReservationError extends TransactionError {
   readonly sender: string;
   readonly chainId: string;

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { Ed25519Signer, XianClient } from "../packages/client/dist/index.js";
+import { Ed25519Signer, XianClient, fixedValueText } from "../packages/client/dist/index.js";
 import {
   deadlineFromNow,
   fixedUnits,
@@ -46,8 +46,8 @@ async function main() {
     id: pairId,
     token0: String(token0),
     token1: String(token1),
-    reserve0: String(reserve0),
-    reserve1: String(reserve1),
+    reserve0: fixedValueText(reserve0) ?? String(reserve0),
+    reserve1: fixedValueText(reserve1) ?? String(reserve1),
     precision0,
     precision1,
   };
@@ -65,7 +65,7 @@ async function main() {
   const plan = planXianDexV2ExactInExecution({
     quote,
     recipient: signer.address,
-    allowance: String(allowanceValue ?? 0),
+    allowance: fixedValueText(allowanceValue) ?? String(allowanceValue ?? 0),
     approvalAmount: amountIn,
     slippageBps: 100,
     deadline: deadlineFromNow(5),

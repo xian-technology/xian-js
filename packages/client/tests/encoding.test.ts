@@ -15,7 +15,7 @@ import {
   verifyMessage,
   verifyXianMessage
 } from "../src/index";
-import { hexToBytes, normalizeMaybeInteger } from "../src/encoding";
+import { bytesToUtf8, hexToBytes, normalizeMaybeInteger, utf8ToBytes } from "../src/encoding";
 
 describe("@xian-tech/client encoding", () => {
   it("canonicalizes payloads with sorted keys", () => {
@@ -132,6 +132,12 @@ describe("@xian-tech/client encoding", () => {
     expect(canonical).toBe('{"kwargs":{"memo":"snowman: ☃"}}');
   });
 
+  it("preserves an initial U+FEFF and rejects invalid UTF-8", () => {
+    const text = "\uFEFFe\u0301😀";
+    expect(bytesToUtf8(utf8ToBytes(text))).toBe(text);
+    expect(() => bytesToUtf8(Uint8Array.of(0xff))).toThrow();
+  });
+
   it("sorts nested unicode object keys by code point", () => {
     const canonical = canonicalizeRuntime({
       kwargs: {
@@ -183,4 +189,54 @@ it("reads user JSON amounts before host-number coercion", () => {
   });
   for (const input of ["1.", "1e+", "[.5]", "01", "{bad}"]) expect(() => parseContractJson(input)).toThrow(SyntaxError);
   for (const input of ["1e-31", '{"__fixed__":"01"}', String(1n << 512n)]) expect(() => parseContractJson(input)).toThrow();
+});
+
+it("round-trips V2 decimals, bytes, datetime, deltas and ordered typed sets", () => {
+  const value = {
+    amount: fixed("1.000000000000000000000000000001"),
+    text: "1.000000000000000000000000000001",
+    bytes: new Uint8Array([0, 255]),
+    bytearray: { __bytearray__: "00ff" },
+    time: { __time__: [2000, 2, 29, 23, 59, 59, 999_999] },
+    elapsed: { __delta__: [-2, 1] },
+    set: {
+      __set__: { codec: "xian-set-1", items: [
+        ["none"], ["bool", true], ["int", "-1"], ["fixed", "1"],
+        ["datetime", [2000, 2, 29, 23, 59, 59, 999_999]], ["timedelta", "-2"],
+        ["str", "\uE000"], ["str", "😀"], ["bytes", "fe"], ["bytes", "ff"],
+        ["tuple", [["int", "0"]]], ["tuple", [["int", "1"]]],
+        ["frozenset", [["int", "3"]]]
+      ] }
+    }
+  };
+  expect(decodeRuntime(encodeRuntime(value))).toEqual(value);
+  expect(decodeRuntime('{"__bytes__":"0A 0b"}')).toEqual(new Uint8Array([10, 11]));
+});
+
+it.each([
+  { "key\uD800": 1 },
+  { text: "\uDFFF" },
+  { __bytes__: "0 A" },
+  { __bytearray__: "foo" },
+  { __bytes__: "00", other: true },
+  { __time__: [1900, 2, 29] },
+  { __time__: [2026, 1, 1, 24] },
+  { __delta__: [1, 0, 0] },
+  { __delta__: [1_000_000_000, 0] },
+  { __set__: { codec: "xian-set-1", items: [["none", 0]] } },
+  { __set__: { codec: "xian-set-1", items: [["fixed", "1" + "0".repeat(91)]] } },
+  { __set__: { codec: "xian-set-1", items: [["int", "1"], ["int", "1"]] } },
+  { __set__: { codec: "xian-set-1", items: [["str", "😀"], ["str", "\uE000"]] } },
+  { __set__: { codec: "xian-set-1", items: [["frozenset", [["int", "2"], ["int", "1"]]]] } },
+  { __set__: { codec: "xian-set-1", items: [["int", "1"], ["fixed", "1" + "0".repeat(30)]] } },
+  { __set__: { codec: "xian-set-1", items: [["bytes", "A0"]] } },
+  { __set__: { codec: "xian-set-1", items: [["unknown", "x"]] } },
+])("rejects invalid V2 values before producing JSON (%j)", (value) => {
+  expect(() => encodeRuntime(value)).toThrow();
+});
+
+it("bounds nested JSON and rejects missing array elements before signing", () => {
+  const nested = Array.from({ length: 130 }).reduce<unknown>((item) => [item], null);
+  expect(() => encodeRuntime(nested)).toThrow("traversal limit");
+  expect(() => encodeRuntime(Array(1))).toThrow("unsupported runtime value");
 });

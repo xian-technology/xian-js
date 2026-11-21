@@ -61,7 +61,13 @@ list with `available: true`.
 The client, compiler bridge, standalone wire codecs and transaction preparation default to `xian_vm_v2`. For an archived V1 test configuration, explicitly set `vmProfile: "xian_vm_v1"` or pass `"xian_vm_v1"` to the standalone helpers.
 Pass decimals as `fixed("1.25")` and integers above the safe-integer range
 as `bigint`. For user-entered nested JSON use `parseContractJson(text)`. It
-reads numeric tokens before JavaScript rounds them. Contract calls and state
-reads return decimals as exact strings and large integers as `bigint`.
+reads numeric tokens before JavaScript rounds them. V2 contract calls and state
+reads return decimals as `{ __fixed__: "1.25" }` and large integers as `bigint`.
+Pass the returned value directly to another contract call or use
+`fixedValueText(value)` for display. Receipt execution results use these same
+types. The signed transaction in a receipt preserves its original wire tags.
+
+`getTx` throws `TxNotFoundError` for an unknown hash. `waitForTx` can recover
+committed receipts from recent blocks when the transaction index is unavailable.
 
 Use `compileContractArtifacts({ moduleName, source })` from `@xian-tech/client` with the optional WASM compiler installed to inspect a V2 artifact offline. Pass `vmProfile: "xian_vm_v1"` to reproduce archived V1 artifacts. Deployments send cleartext source to the validator.

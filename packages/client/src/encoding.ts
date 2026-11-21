@@ -1,4 +1,5 @@
-import { DEFAULT_VM_PROFILE, checkInteger, checkNumericWrapper, fixed, type XianVmProfile } from "./numeric.js";
+import { DEFAULT_VM_PROFILE, checkInteger, fixed, type XianVmProfile } from "./numeric.js";
+import { assertUnicode, checkRuntimeWrapper, compareUnicodeCodePoints, decodeWireHex } from "./runtime-wire.js";
 
 const MIN_INT64 = -(2n ** 63n);
 const MAX_INT64 = 2n ** 63n - 1n;
@@ -9,7 +10,7 @@ export function utf8ToBytes(value: string): Uint8Array {
 }
 
 export function bytesToUtf8(value: Uint8Array): string {
-  return new TextDecoder().decode(value);
+  return new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }).decode(value);
 }
 
 export function bytesToHex(value: Uint8Array): string {
@@ -31,42 +32,28 @@ export function hexToBytes(value: string): Uint8Array {
   return out;
 }
 
-export function base64ToUtf8(value: string): string {
+export function base64ToBytes(value: string): Uint8Array {
   if (typeof atob === "function") {
-    return bytesToUtf8(
-      Uint8Array.from(atob(value), (character) => character.charCodeAt(0))
-    );
+    return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
   }
 
   // Node.js runtimes that pre-date the global atob (added in Node 16) still
   // have Buffer available. Check for it before falling over so the SDK keeps
   // working in older server-side consumers.
-  const maybeBuffer = (globalThis as { Buffer?: { from(input: string, encoding: string): { toString(encoding: string): string } } }).Buffer;
+  const maybeBuffer = (globalThis as { Buffer?: { from(input: string, encoding: string): Uint8Array } }).Buffer;
   if (maybeBuffer && typeof maybeBuffer.from === "function") {
-    return maybeBuffer.from(value, "base64").toString("utf-8");
+    return maybeBuffer.from(value, "base64");
   }
 
   throw new TypeError("global atob() or Buffer is required to decode base64 payloads");
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return Object.prototype.toString.call(value) === "[object Object]";
+export function base64ToUtf8(value: string): string {
+  return bytesToUtf8(base64ToBytes(value));
 }
 
-function compareUnicodeCodePoints(left: string, right: string): number {
-  const leftPoints = Array.from(left);
-  const rightPoints = Array.from(right);
-  const length = Math.min(leftPoints.length, rightPoints.length);
-
-  for (let index = 0; index < length; index += 1) {
-    const leftPoint = leftPoints[index]!.codePointAt(0)!;
-    const rightPoint = rightPoints[index]!.codePointAt(0)!;
-    if (leftPoint !== rightPoint) {
-      return leftPoint - rightPoint;
-    }
-  }
-
-  return leftPoints.length - rightPoints.length;
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Object.prototype.toString.call(value) === "[object Object]";
 }
 
 export function sortKeysDeep<T>(value: T): T {
@@ -97,34 +84,46 @@ function encodeInt(value: bigint | number): bigint | number | { __big_int__: str
   return { __big_int__: normalized.toString() };
 }
 
-function encodeValue(value: unknown, profile: XianVmProfile): unknown {
+function encodeNumber(value: number | bigint, profile: XianVmProfile): unknown {
   if (typeof value === "bigint") {
     if (profile === "xian_vm_v2") checkInteger(value);
     return encodeInt(value);
   }
-  if (typeof value === "number") {
-    if (profile === "xian_vm_v2" && !Number.isSafeInteger(value)) {
-      throw new TypeError("use bigint for large integers and fixed(text) for decimals");
-    }
-    if (!Number.isFinite(value)) {
-      throw new TypeError("finite numbers only");
-    }
-    if (Number.isInteger(value)) {
-      return encodeInt(value);
-    }
+  if (profile === "xian_vm_v2" && !Number.isSafeInteger(value)) {
+    throw new TypeError("use bigint for large integers and fixed(text) for decimals");
+  }
+  if (!Number.isFinite(value)) throw new TypeError("finite numbers only");
+  return Number.isInteger(value) ? encodeInt(value) : value;
+}
+
+function encodeRecord(value: Record<string, unknown>, profile: XianVmProfile, depth: number): unknown {
+  if (profile === "xian_vm_v2") checkRuntimeWrapper(value);
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => {
+      if (profile === "xian_vm_v2") assertUnicode(key);
+      return [key, encodeValue(entry, profile, depth + 1)];
+    })
+  );
+}
+
+function encodeValue(value: unknown, profile: XianVmProfile, depth = 0): unknown {
+  if (depth > 128) throw new RangeError("runtime value traversal limit exceeded");
+  if (typeof value === "string") {
+    if (profile === "xian_vm_v2") assertUnicode(value);
     return value;
+  }
+  if (typeof value === "number" || typeof value === "bigint") {
+    return encodeNumber(value, profile);
   }
   if (value instanceof Uint8Array) {
     return { __bytes__: bytesToHex(value) };
   }
   if (Array.isArray(value)) {
-    return value.map((item) => encodeValue(item, profile));
+    return Array.from(value, (item) => encodeValue(item, profile, depth + 1));
   }
-  if (isPlainObject(value)) {
-    if (profile === "xian_vm_v2") checkNumericWrapper(value);
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, encodeValue(entry, profile)])
-    );
+  if (isPlainObject(value)) return encodeRecord(value, profile, depth);
+  if (profile === "xian_vm_v2" && value !== null && typeof value !== "boolean") {
+    throw new TypeError("unsupported runtime value");
   }
   return value;
 }
@@ -180,6 +179,13 @@ function parseRuntimeJson(text: string, mode: XianVmProfile | "source"): unknown
   return JSON.parse(text.replace(JSON_STRING_OR_NUMBER, (token) => numericToken(token, mode)));
 }
 
+/** Keep the exact JSON values and tags in an already-signed V2 document. */
+export function parseTransactionWire(text: string, profile: XianVmProfile): unknown {
+  const value = profile === "xian_vm_v2" ? parseRuntimeJson(text, profile) : JSON.parse(text);
+  if (profile === "xian_vm_v2") encodeValue(value, profile);
+  return value;
+}
+
 /** Parse contract input JSON from text before JavaScript can round numeric tokens. */
 export function parseContractJson(text: string): unknown {
   return encodeValue(parseRuntimeJson(text, "source"), "xian_vm_v2");
@@ -196,15 +202,15 @@ function decodeValue(value: unknown, profile: XianVmProfile): unknown {
     return value;
   }
 
-  if (profile === "xian_vm_v2") checkNumericWrapper(value);
+  if (profile === "xian_vm_v2") checkRuntimeWrapper(value);
   if ("__big_int__" in value && typeof value.__big_int__ === "string") {
     return BigInt(value.__big_int__);
   }
   if ("__bytes__" in value && typeof value.__bytes__ === "string") {
-    return hexToBytes(value.__bytes__);
+    return profile === "xian_vm_v2" ? decodeWireHex(value.__bytes__) : hexToBytes(value.__bytes__);
   }
   if ("__fixed__" in value && typeof value.__fixed__ === "string") {
-    return value.__fixed__;
+    return profile === "xian_vm_v2" ? value : value.__fixed__;
   }
 
   return Object.fromEntries(

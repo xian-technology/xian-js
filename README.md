@@ -62,8 +62,11 @@ console.log(submission.txHash, submission.receipt?.success);
 New clients, standalone wire helpers, offline transaction preparation and the compiler bridge use `xian_vm_v2` by default. Pass large integers as `bigint` and decimal
 amounts as `fixed("0.000000000000000000000000000001")` from
 `@xian-tech/client`. Use exact decimal strings for token helpers.
-The SDK checks limits before signing or simulation. Decoded contract
-decimals are plain strings. For archived V1 fixtures, explicitly select `vmProfile: "xian_vm_v1"` on the client or compiler bridge, or pass `"xian_vm_v1"` as the second argument to a standalone wire helper.
+The SDK checks limits before signing or simulation. V2 reads return decimals
+as `{ __fixed__: "1.25" }`. Pass the value directly into another contract call,
+or use `fixedValueText(value)` for display. For archived V1 fixtures, explicitly
+select `vmProfile: "xian_vm_v1"` on the client or compiler bridge, or pass
+`"xian_vm_v1"` as the second argument to a standalone wire helper.
 
 For V2 swaps, `selectBestXianDexV2ExactInRoute` accepts reserve and input
 amounts as strings. Supply each token's precision from metadata using

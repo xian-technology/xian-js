@@ -1,7 +1,8 @@
 import { fetchResponse, readJsonResponse, readRpcErrorAnswer, withRequestDeadline } from "./transport.js";
 import { BROADCAST_ENDPOINTS, duplicateTxMessage, parseBroadcastResponse } from "./broadcast.js";
+import { BlockReceiptLookup } from "./block-receipt.js";
 import { asRecord, readErrorMessage } from "./rpc-response.js";
-import { DEFAULT_VM_PROFILE, fixed, parseInteger, type XianVmProfile } from "./numeric.js";
+import { DEFAULT_VM_PROFILE, fixed, fixedValueText, parseInteger, type XianVmProfile } from "./numeric.js";
 import { prepareTransaction, type PreparedTransaction } from "./transaction.js";
 import {
   base64ToUtf8,
@@ -14,12 +15,13 @@ import {
   normalizeMaybeInteger,
   normalizeMaybeXianNumber,
   parseXianNumber,
+  parseTransactionWire,
   sortKeysDeep,
   utf8ToBytes
 } from "./encoding.js";
 import { chiToSupply } from "./chi.js";
 import { isValidEd25519Signature } from "./ed25519.js";
-import { AbciError, RpcError, SimulationError, TransactionError, TransportError, TxTimeoutError } from "./errors.js";
+import { AbciError, RpcError, SimulationError, TransactionError, TransportError, TxNotFoundError, TxTimeoutError } from "./errors.js";
 import { NonceReservationManager } from "./nonce-reservation.js";
 import { WatchApi } from "./watch.js";
 import type {
@@ -342,7 +344,7 @@ function isPendingLookupReceipt(receipt: TransactionReceipt): boolean {
   return !receipt.success && receipt.txHash == null && receipt.transaction == null;
 }
 
-function validatePayload(payload: XianTxPayload): void {
+function validatePayload(payload: XianTxPayload, profile: XianVmProfile): void {
   const keys = Object.keys(payload).sort();
   const expected = ["chain_id", "chi_supplied", "contract", "function", "kwargs", "nonce", "sender"];
   if (keys.join(",") !== expected.join(",")) {
@@ -350,6 +352,9 @@ function validatePayload(payload: XianTxPayload): void {
   }
   if (!isHexKey(payload.sender)) {
     throw new TransactionError("sender must be a 32-byte hex public key");
+  }
+  if (typeof payload.chain_id !== "string" || !payload.chain_id) {
+    throw new TransactionError("chain_id must be a nonempty string");
   }
   if (!isIdentifier(payload.contract)) {
     throw new TransactionError("contract must be a valid identifier");
@@ -372,7 +377,7 @@ function validatePayload(payload: XianTxPayload): void {
       throw new TransactionError("kwargs keys must be valid identifiers");
     }
   }
-  if (!validateTransactionJsonValue(payload.kwargs)) {
+  if (profile === "xian_vm_v1" && !validateTransactionJsonValue(payload.kwargs)) {
     throw new TransactionError("kwargs values must be JSON-compatible transaction values");
   }
 }
@@ -475,8 +480,9 @@ export class XianClient {
     if (info === "json") return JSON.parse(decodedUtf8);
     if (this.vmProfile === "xian_vm_v2") {
       if (info === "decimal") {
-        if (fixed(decodedUtf8).__fixed__ !== decodedUtf8) throw new TypeError("noncanonical decimal state");
-        return decodedUtf8;
+        const amount = fixed(decodedUtf8);
+        if (amount.__fixed__ !== decodedUtf8) throw new TypeError("noncanonical decimal state");
+        return amount;
       }
       if (info === "int") {
         const integer = parseInteger(decodedUtf8);
@@ -500,18 +506,11 @@ export class XianClient {
   private normalizeTxLookup(data: Record<string, unknown>): TransactionReceipt {
     const result = asRecord(data.result ?? {});
     const txResult = asRecord(result.tx_result ?? {});
-    const executionText = txResult.data == null ? undefined : base64ToUtf8(String(txResult.data));
+    const executionText = txResult.data == null || txResult.data === ""
+      ? undefined : base64ToUtf8(String(txResult.data));
     const execution = executionText === undefined ? undefined :
       this.vmProfile === "xian_vm_v2" ? decodeRuntime(executionText, this.vmProfile) : parseJsonResult(executionText);
     const transaction = result.tx == null ? undefined : (this.decodeTxRecord(String(result.tx)) as XianSignedTransaction);
-
-    if ("error" in data) {
-      return {
-        success: false,
-        message: readErrorMessage(asRecord(data.error)),
-        response: data
-      };
-    }
 
     const code = txResult.code;
     const success = typeof code === "number" ? code === 0 : false;
@@ -529,6 +528,11 @@ export class XianClient {
 
   private decodeTxRecord(value: string): unknown {
     const hexPayload = base64ToUtf8(value);
+    if (this.vmProfile === "xian_vm_v2") {
+      // CometBFT stores the ASCII hex bytes of the signed document.
+      const text = hexPayload.startsWith("{") ? hexPayload : bytesToUtf8(hexToBytes(hexPayload));
+      return parseTransactionWire(text, this.vmProfile);
+    }
     const decoded = decodeRuntime(hexPayload, this.vmProfile);
     if (decoded != null) {
       return decoded;
@@ -566,8 +570,24 @@ export class XianClient {
   }
 
   async getTx(txHash: string): Promise<TransactionReceipt> {
-    const data = await this.requestJson("GET", `${this.rpcUrl}/tx?hash=0x${txHash}`);
+    return this.readTx(txHash);
+  }
+
+  private async readTx(txHash: string, timeoutMs?: number): Promise<TransactionReceipt> {
+    const data = await this.readRpc("/tx?hash=0x" + txHash, timeoutMs);
     return this.normalizeTxLookup(data);
+  }
+
+  private async readRpc(path: string, timeoutMs?: number): Promise<Record<string, unknown>> {
+    const data = await this.requestJson("GET", this.rpcUrl + path, { rpcErrorAnswers: true, timeoutMs });
+    if ("error" in data) {
+      const message = readErrorMessage(asRecord(data.error));
+      if (/^tx \([0-9A-Fa-f]+\) not found$/.test(message)) {
+        throw new TxNotFoundError(message, { cause: data.error });
+      }
+      throw new RpcError(message, data.error);
+    }
+    return data;
   }
 
   async getNonce(address: string): Promise<number | bigint> {
@@ -654,7 +674,7 @@ export class XianClient {
           .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
           .map((item): XianTokenBalance => ({
             contract: String(item.contract ?? ""),
-            balance: normalizeMaybeString(item.balance),
+            balance: fixedValueText(item.balance) ?? normalizeMaybeString(item.balance),
             name: normalizeMaybeString(item.name),
             symbol: normalizeMaybeString(item.symbol),
             logoUrl: normalizeMaybeString(item.logo_url),
@@ -1016,7 +1036,7 @@ export class XianClient {
       chiSupplied = chiToSupply(estimate.estimated);
     }
 
-    const payload = sortKeysDeep({
+    const payload = {
       chain_id: chainId,
       contract: request.contract,
       function: request.function,
@@ -1024,30 +1044,32 @@ export class XianClient {
       nonce,
       sender: request.sender,
       chi_supplied: chiSupplied
-    }) as XianTxPayload;
+    } satisfies XianTxPayload;
 
-    validatePayload(payload);
-    if (this.vmProfile === "xian_vm_v2") encodeRuntime(payload.kwargs, this.vmProfile);
-    return { payload };
+    validatePayload(payload, this.vmProfile);
+    if (this.vmProfile === "xian_vm_v2") encodeRuntime(payload, this.vmProfile);
+    return { payload: sortKeysDeep(payload) };
   }
 
   async signTx(tx: XianUnsignedTransaction, signer: XianSigner): Promise<XianSignedTransaction> {
-    validatePayload(tx.payload);
+    validatePayload(tx.payload, this.vmProfile);
+    const message = canonicalizeRuntime(tx.payload, this.vmProfile);
+    const payload = sortKeysDeep(tx.payload);
 
     const signerAddress =
       typeof signer.getAddress === "function" ? await signer.getAddress() : undefined;
-    if (signerAddress && signerAddress !== tx.payload.sender) {
+    if (signerAddress && signerAddress !== payload.sender) {
       throw new TransactionError("signer address does not match payload sender");
     }
 
-    const signature = await signer.signMessage(canonicalizeRuntime(tx.payload, this.vmProfile));
+    const signature = await signer.signMessage(message);
     if (!isValidEd25519Signature(signature)) {
       throw new TransactionError("signer returned an invalid Ed25519 signature");
     }
 
     return sortKeysDeep({
       metadata: { signature },
-      payload: tx.payload
+      payload
     }) as XianSignedTransaction;
   }
 
@@ -1055,7 +1077,7 @@ export class XianClient {
     tx: XianSignedTransaction,
     options?: BroadcastTxOptions
   ): Promise<TransactionSubmission> {
-    validatePayload(tx.payload);
+    validatePayload(tx.payload, this.vmProfile);
     const mode = options?.mode ?? "checktx";
     if (!["async", "checktx", "commit"].includes(mode)) {
       throw new TransactionError("mode must be one of: async, checktx, commit");
@@ -1104,23 +1126,41 @@ export class XianClient {
     const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const pollIntervalMs = options?.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
     const deadline = Date.now() + timeoutMs;
+    const budget = () => {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new TxTimeoutError("transaction lookup deadline expired");
+      return this.requestTimeoutMs > 0 ? Math.min(this.requestTimeoutMs, remaining) : remaining;
+    };
+    const blocks = new BlockReceiptLookup((path) => this.readRpc(path, budget()), txHash.toUpperCase());
     let lastError: unknown;
 
     while (Date.now() < deadline) {
       try {
-        const receipt = await this.getTx(txHash);
-        if (!isPendingLookupReceipt(receipt)) {
-          return receipt;
-        }
+        const receipt = await this.readTxWithFallback(txHash, budget(), blocks);
+        if (receipt !== undefined) return receipt;
       } catch (error) {
         lastError = error;
       }
-      await sleep(pollIntervalMs);
+      await sleep(Math.max(0, Math.min(pollIntervalMs, deadline - Date.now())));
     }
 
     throw new TxTimeoutError(`timed out waiting for transaction ${txHash}`, {
       cause: lastError
     });
+  }
+
+  private async readTxWithFallback(
+    hash: string, timeoutMs: number, blocks: BlockReceiptLookup
+  ): Promise<TransactionReceipt | undefined> {
+    try {
+      const receipt = await this.readTx(hash, timeoutMs);
+      return isPendingLookupReceipt(receipt) ? undefined : receipt;
+    } catch (error) {
+      if (!(error instanceof RpcError || error instanceof TxNotFoundError)) throw error;
+      const result = await blocks.find();
+      if (result === undefined) throw error;
+      return this.normalizeTxLookup(result);
+    }
   }
 
   async sendTx(
@@ -1285,8 +1325,8 @@ export class TokenClient {
     return this.client.getTokenMetadata(this.tokenName);
   }
 
-  allowance(owner: string, spender: string): Promise<unknown> {
-    return this.client.getState(this.tokenName, "approvals", [owner, spender]);
+  async allowance(owner: string, spender: string): Promise<unknown> {
+    return (await this.client.getState(this.tokenName, "approvals", [owner, spender])) ?? 0;
   }
 
   async transfer(options: TokenTransferOptions): Promise<TransactionSubmission> {

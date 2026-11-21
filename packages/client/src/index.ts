@@ -41,6 +41,7 @@ export {
   SimulationError,
   TransactionError,
   TransportError,
+  TxNotFoundError,
   TxTimeoutError,
   XianClientError
 } from "./errors.js";
@@ -49,4 +50,4 @@ export type * from "./types.js";
 
 export { prepareTransaction, type PreparedTransaction } from "./transaction.js";
 
-export { fixed, type XianVmProfile } from "./numeric.js";
+export { fixed, fixedValueText, type XianVmProfile } from "./numeric.js";
