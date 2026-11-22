@@ -264,6 +264,12 @@ export interface XianDexCandle {
   raw: Record<string, unknown>;
 }
 
+export interface XianDexCandlePage {
+  items: XianDexCandle[];
+  indexedHeight: XianNumber | null;
+  nextBefore: string | null;
+}
+
 export interface BroadcastTxOptions {
   mode?: BroadcastMode;
   waitForTx?: boolean;

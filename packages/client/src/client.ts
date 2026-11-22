@@ -39,6 +39,7 @@ import type {
   XianContractVars,
   XianDexCandle,
   XianDexCandleOptions,
+  XianDexCandlePage,
   XianEventListOptions,
   XianIndexedBlock,
   XianIndexedEvent,
@@ -953,6 +954,13 @@ export class XianClient {
     marketId: number | string,
     options?: XianDexCandleOptions
   ): Promise<XianDexCandle[]> {
+    return (await this.getDexCandlePage(marketId, options)).items;
+  }
+
+  async getDexCandlePage(
+    marketId: number | string,
+    options?: XianDexCandleOptions
+  ): Promise<XianDexCandlePage> {
     const limit = pageLimit(options);
     const offset = pageOffset(options);
     const interval = options?.interval ?? "1m";
@@ -971,7 +979,15 @@ export class XianClient {
     if (end !== null) {
       path += `/end=${end}`;
     }
-    return normalizeDexCandles(await this.abciValue<unknown>(path));
+    const value = await this.abciValue<unknown>(path);
+    const metadata = value != null && typeof value === "object" && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : {};
+    return {
+      items: normalizeDexCandles(value),
+      indexedHeight: normalizeMaybeXianNumber(metadata.indexed_height),
+      nextBefore: normalizeMaybeString(metadata.next_before)
+    };
   }
 
   async getStateHistory(
