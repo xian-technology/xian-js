@@ -21,8 +21,8 @@
 - `docs/BACKLOG.md`: future work and links to deeper notes.
 
 ## Workflow
-- Treat `../xian-meta/docs/XIAN_JS_SDK_MVP.md` as the shared cross-repo
-  contract until the implementation diverges intentionally.
+- Use `../xian-docs-web/api/index.md` for the node API and
+  `../xian-meta/docs/NUMERIC_PROFILE_V2.md` for shared numeric semantics.
 - When public behavior changes, update `xian-docs-web` and
   `../xian-wallet-browser` alongside this repo where relevant.
 - Favor explicit transport and transaction behavior over hidden retries or
