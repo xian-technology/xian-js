@@ -356,7 +356,9 @@ owner-side recovery method, not a provider request exposed to dapps.
 `ProviderBackedXianSigner` delegates canonical transaction payloads through
 `xian_signTransaction`. It does not expose a raw provider message-signing mode.
 
-Subscribe to dashboard websocket streams:
+Subscribe to dashboard websocket streams. Watchers use the global
+`WebSocket` or the client's `webSocketFactory` option. RPC calls work
+without either.
 
 ```ts
 const blockSub = client.watch.blocks((message) => {
@@ -375,6 +377,8 @@ const balanceSub = client.watch.state(
 await blockSub.unsubscribe();
 await balanceSub.unsubscribe();
 ```
+
+Unsubscribing stops delivery of messages that have yet to reach the listener.
 
 Talk to a shielded relayer:
 

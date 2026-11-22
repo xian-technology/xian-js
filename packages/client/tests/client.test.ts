@@ -386,6 +386,39 @@ describe("@xian-tech/client", () => {
     expect(sockets[0]?.closeCalls).toBe(1);
   });
 
+  it("does not deliver a pending message after watch unsubscribe", async () => {
+    const socket = new FakeSocket("ws://127.0.0.1:8080/ws", []);
+    const client = new XianClient({
+      rpcUrl: "http://127.0.0.1:26657",
+      dashboardUrl: "http://127.0.0.1:8080",
+      webSocketFactory: () => socket
+    });
+    const listener = vi.fn();
+    const subscription = client.watch.blocks(listener);
+
+    const pendingMessage = socket.message('{"type":"new_block"}');
+    await subscription.unsubscribe();
+    await pendingMessage;
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("reads RPC status without a WebSocket implementation", async () => {
+    vi.stubGlobal("WebSocket", undefined);
+    try {
+      const client = new XianClient({
+        rpcUrl: "http://127.0.0.1:26657",
+        dashboardUrl: "http://127.0.0.1:8080",
+        fetchFn: async () => jsonResponse({ result: { ready: true } })
+      });
+
+      await expect(client.getStatus()).resolves.toEqual({ result: { ready: true } });
+      expect(() => client.watch.blocks(vi.fn())).toThrow("global WebSocket is not available");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("converts https dashboard URLs to secure websocket URLs", async () => {
     const sockets: FakeSocket[] = [];
     const webSocketFactory = vi.fn((url: string) => {

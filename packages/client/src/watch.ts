@@ -98,6 +98,9 @@ class ManagedSubscription<TMessage> implements WatchSubscription {
 
   private async handleMessage(rawData: unknown): Promise<void> {
     const text = await coerceSocketMessage(rawData);
+    if (this.closed) {
+      return;
+    }
     let parsed: unknown;
     try {
       parsed = JSON.parse(text);
@@ -146,11 +149,7 @@ function isContractEventMessage(value: unknown): value is XianContractEventMessa
 }
 
 export class WatchApi {
-  private readonly webSocketFactory: XianWebSocketFactory;
-
-  constructor(private readonly options: WatchApiOptions) {
-    this.webSocketFactory = ensureWebSocketFactory(options.webSocketFactory);
-  }
+  constructor(private readonly options: WatchApiOptions) {}
 
   private socketUrl(): string {
     if (!this.options.dashboardUrl) {
@@ -165,13 +164,21 @@ export class WatchApi {
     return url.toString();
   }
 
+  private subscribe<T>(
+    options: Omit<ManagedSubscriptionOptions<T>, "url" | "webSocketFactory">
+  ): WatchSubscription {
+    return new ManagedSubscription({
+      url: this.socketUrl(),
+      webSocketFactory: ensureWebSocketFactory(this.options.webSocketFactory),
+      ...options
+    });
+  }
+
   blocks(
     listener: (message: XianBlockMessage) => void | Promise<void>,
     options?: XianWatchOptions
   ): WatchSubscription {
-    return new ManagedSubscription({
-      url: this.socketUrl(),
-      webSocketFactory: this.webSocketFactory,
+    return this.subscribe({
       shouldHandle: isBlockMessage,
       onMessage: listener,
       onError: options?.onError
@@ -183,9 +190,7 @@ export class WatchApi {
     listener: (message: XianStateChangeMessage) => void | Promise<void>,
     options?: XianWatchOptions
   ): WatchSubscription {
-    return new ManagedSubscription({
-      url: this.socketUrl(),
-      webSocketFactory: this.webSocketFactory,
+    return this.subscribe({
       subscribeMessage: {
         action: "subscribe",
         type: "state",
@@ -202,9 +207,7 @@ export class WatchApi {
     listener: (message: XianContractEventMessage) => void | Promise<void>,
     options?: XianWatchOptions
   ): WatchSubscription {
-    return new ManagedSubscription({
-      url: this.socketUrl(),
-      webSocketFactory: this.webSocketFactory,
+    return this.subscribe({
       subscribeMessage: {
         action: "subscribe",
         type: "event",
