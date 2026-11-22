@@ -143,6 +143,10 @@ function normalizeMaybeString(value: unknown): string | null {
   return typeof value === "string" ? value : String(value);
 }
 
+function normalizeMaybeDecimalText(value: unknown): string | null {
+  return fixedValueText(value) ?? normalizeMaybeString(value);
+}
+
 function normalizeMaybeBoolean(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null;
 }
@@ -241,12 +245,12 @@ function normalizeDexCandle(item: Record<string, unknown>): XianDexCandle {
     pairId: normalizeMaybeInteger(item.pair_id),
     bucketStart: normalizeMaybeString(item.bucket_start),
     bucketEnd: normalizeMaybeString(item.bucket_end),
-    open: normalizeMaybeString(item.open),
-    high: normalizeMaybeString(item.high),
-    low: normalizeMaybeString(item.low),
-    close: normalizeMaybeString(item.close),
-    volumeToken0: normalizeMaybeString(item.volume_token0),
-    volumeToken1: normalizeMaybeString(item.volume_token1),
+    open: normalizeMaybeDecimalText(item.open),
+    high: normalizeMaybeDecimalText(item.high),
+    low: normalizeMaybeDecimalText(item.low),
+    close: normalizeMaybeDecimalText(item.close),
+    volumeToken0: normalizeMaybeDecimalText(item.volume_token0),
+    volumeToken1: normalizeMaybeDecimalText(item.volume_token1),
     tradeCount: normalizeMaybeInteger(item.trade_count),
     firstBlockHeight: normalizeMaybeXianNumber(item.first_block_height),
     lastBlockHeight: normalizeMaybeXianNumber(item.last_block_height),
@@ -675,7 +679,7 @@ export class XianClient {
           .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
           .map((item): XianTokenBalance => ({
             contract: String(item.contract ?? ""),
-            balance: fixedValueText(item.balance) ?? normalizeMaybeString(item.balance),
+            balance: normalizeMaybeDecimalText(item.balance),
             name: normalizeMaybeString(item.name),
             symbol: normalizeMaybeString(item.symbol),
             logoUrl: normalizeMaybeString(item.logo_url),
@@ -961,10 +965,12 @@ export class XianClient {
     marketId: number | string,
     options?: XianDexCandleOptions
   ): Promise<XianDexCandlePage> {
+    if ((options?.offset ?? 0) !== 0) {
+      throw new RangeError("Candle queries accept only offset=0. Pass nextBefore as end instead.");
+    }
     const limit = pageLimit(options);
-    const offset = pageOffset(options);
     const interval = options?.interval ?? "1m";
-    let path = `/dex_candles/${marketId}/interval=${interval}/limit=${limit}/offset=${offset}`;
+    let path = `/dex_candles/${marketId}/interval=${interval}/limit=${limit}`;
     if (options?.source) {
       path += `/source=${options.source}`;
     }

@@ -776,7 +776,7 @@ describe("@xian-tech/client", () => {
       if (
         url.pathname.endsWith("/abci_query") &&
         path.includes(
-          "/dex_candles/7/interval=5m/limit=25/offset=5/source=xian_pairs_v1/start=1767225600/end=1767225900"
+          "/dex_candles/7/interval=5m/limit=25/source=xian_pairs_v1/start=1767225600/end=1767225900"
         )
       ) {
         return jsonResponse({
@@ -797,11 +797,11 @@ describe("@xian-tech/client", () => {
                       market_id: "7",
                       bucket_start: "2026-01-01T00:00:00Z",
                       bucket_end: "2026-01-01T00:05:00Z",
-                      open: "1.0",
-                      high: "1.5",
-                      low: "0.9",
-                      close: "1.4",
-                      volume_token0: "12.5",
+                      open: { __fixed__: "1.000000000000000000000000000001" },
+                      high: { __fixed__: "1.5" },
+                      low: { __fixed__: "0.9" },
+                      close: { __fixed__: "1.4" },
+                      volume_token0: { __fixed__: "12.5" },
                       volume_token1: "17.5",
                       trade_count: 2,
                       first_block_height: 100,
@@ -860,7 +860,7 @@ describe("@xian-tech/client", () => {
         source: "xian_pairs_v1",
         interval: "5m",
         limit: 25,
-        offset: 5,
+        offset: 0,
         start: new Date("2026-01-01T00:00:00Z"),
         end: 1767225900
       })
@@ -871,7 +871,7 @@ describe("@xian-tech/client", () => {
         pairId: 7,
         bucketStart: "2026-01-01T00:00:00Z",
         bucketEnd: "2026-01-01T00:05:00Z",
-        open: "1.0",
+        open: "1.000000000000000000000000000001",
         high: "1.5",
         low: "0.9",
         close: "1.4",
@@ -883,6 +883,45 @@ describe("@xian-tech/client", () => {
         firstEventId: 40,
         lastEventId: 41
       }
+    ]);
+  });
+
+  it.each([1, -1, NaN])("rejects candle offset %s before requesting data", async (offset) => {
+    const fetchFn = vi.fn();
+    const client = new XianClient({ rpcUrl: "http://127.0.0.1:26657", fetchFn });
+
+    await expect(client.getDexCandlePage(7, { offset })).rejects.toThrow(/nextBefore/);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("uses the server cursor as the end of the next candle request", async () => {
+    const before = "2026-01-01T00:00:00+00:00";
+    const paths: (string | null)[] = [];
+    const fetchFn = vi.fn(async (input: string | URL) => {
+      paths.push(new URL(String(input)).searchParams.get("path"));
+      return jsonResponse({
+        result: {
+          response: {
+            code: 0,
+            info: "dict",
+            value: encodeBase64Utf8(JSON.stringify({
+              items: [],
+              indexed_height: 12,
+              next_before: paths.length === 1 ? before : null
+            }))
+          }
+        }
+      });
+    }) as typeof fetch;
+    const client = new XianClient({ rpcUrl: "http://127.0.0.1:26657", fetchFn });
+
+    const first = await client.getDexCandlePage(7);
+    expect(first).toEqual({ items: [], indexedHeight: 12, nextBefore: before });
+    const older = await client.getDexCandlePage(7, { end: first.nextBefore! });
+    expect(older.nextBefore).toBeNull();
+    expect(paths).toEqual([
+      '"/dex_candles/7/interval=1m/limit=100"',
+      '"/dex_candles/7/interval=1m/limit=100/end=2026-01-01T00:00:00Z"'
     ]);
   });
 

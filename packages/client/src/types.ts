@@ -183,6 +183,8 @@ export interface XianEventListOptions extends XianPageOptions {
 }
 
 export interface XianDexCandleOptions extends XianPageOptions {
+  /** Only zero is accepted. Pass the page's nextBefore as end for older candles. */
+  offset?: number;
   source?: string;
   contract?: string;
   interval?: number | string;
