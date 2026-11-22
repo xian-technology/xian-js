@@ -161,7 +161,7 @@ function timestampPathParam(value: Date | number | string | undefined): string |
     return null;
   }
   if (value instanceof Date) {
-    return String(Math.floor(value.getTime() / 1000));
+    return value.getUTCMilliseconds() ? value.toISOString() : String(value.getTime() / 1000);
   }
   if (typeof value === "string") {
     const text = value.trim();

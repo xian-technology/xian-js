@@ -886,6 +886,27 @@ describe("@xian-tech/client", () => {
     ]);
   });
 
+  it("preserves millisecond bounds when requesting a candle page", async () => {
+    const fetchFn = vi.fn(async (input: string | URL) => {
+      const path = new URL(String(input)).searchParams.get("path");
+      expect(path).toContain("/start=2026-01-01T00:00:00.123Z/end=2026-01-01T00:00:00.987Z");
+      return jsonResponse({
+        result: {
+          response: {
+            code: 0,
+            value: encodeBase64Utf8('{"items":[]}')
+          }
+        }
+      });
+    }) as typeof fetch;
+    const client = new XianClient({ rpcUrl: "http://127.0.0.1:26657", fetchFn });
+
+    await expect(client.getDexCandlePage(7, {
+      start: new Date("2026-01-01T00:00:00.123Z"),
+      end: new Date("2026-01-01T00:00:00.987Z")
+    })).resolves.toMatchObject({ items: [] });
+  });
+
   it("reads shielded wallet history through the indexed wallet feed", async () => {
     const fetchFn = vi.fn(async (input: string | URL) => {
       const url = new URL(String(input));
