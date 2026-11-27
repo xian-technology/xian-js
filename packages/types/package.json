@@ -1,6 +1,6 @@
 {
   "name": "@xian-tech/types",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Shared TypeScript contracts and dependency-free runtime primitives for Xian",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
