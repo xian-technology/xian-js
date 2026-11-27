@@ -233,7 +233,8 @@ the automatic reservation (CometBFT sends a sync/async refusal such as
 "mempool is full" or "endpoint is closed while node is catching up" with HTTP
 500 and a JSON-RPC error body; that body is the node's answer). A thrown transport error or finalization timeout
 after broadcast is ambiguous, so the sender is quarantined from further
-automatic sends until `get_next_nonce` proves that the network advanced.
+automatic sends until the committed nonce reaches or passes the unresolved
+nonce. Read the original transaction's receipt to confirm its outcome.
 An async broadcast acknowledgment also blocks further automatic sends until
 admission or finalization is established, because it has no CheckTx result.
 A "tx already exists in cache/mempool" response in any mode is reported as

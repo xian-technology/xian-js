@@ -31,6 +31,7 @@ interface NonceState {
   tail: Promise<void>;
   sendTail: Promise<void>;
   next?: bigint;
+  refreshRequired?: boolean;
   quarantined?: bigint;
 }
 
@@ -85,6 +86,7 @@ export class NonceReservationManager {
     await this.withState(scope, (state) => {
       state.next = undefined;
       state.quarantined = undefined;
+      state.refreshRequired = false;
     });
   }
 
@@ -111,7 +113,10 @@ export class NonceReservationManager {
   ): Promise<void> {
     if (!submission.submitted || submission.accepted === false) {
       await this.withState(reservation.scope, (state) => {
-        state.next = undefined;
+        if (state.next !== undefined && !submission.finalized) {
+          state.next = toBigInt(reservation.nonce, this.errors);
+        }
+        state.refreshRequired = true;
       });
     } else if (submission.accepted == null && !submission.finalized) {
       await this.quarantine(reservation);
@@ -149,9 +154,13 @@ export class NonceReservationManager {
         }
         state.quarantined = undefined;
         state.next = networkNonce;
-      } else if (state.next === undefined) {
-        state.next = toBigInt(await readNetworkNonce(), this.errors);
+      } else if (state.next === undefined || state.refreshRequired) {
+        const networkNonce = toBigInt(await readNetworkNonce(), this.errors);
+        if (state.next === undefined || networkNonce > state.next) {
+          state.next = networkNonce;
+        }
       }
+      state.refreshRequired = false;
 
       const nonce = state.next;
       state.next = nonce + 1n;
