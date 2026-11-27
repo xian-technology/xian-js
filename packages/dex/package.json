@@ -1,6 +1,6 @@
 {
   "name": "@xian-tech/dex",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Deterministic Xian DEX quoting and transaction planning",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -51,7 +51,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@xian-tech/types": "0.3.3"
+    "@xian-tech/types": "0.3.4"
   },
   "license": "MIT"
 }

@@ -1,6 +1,6 @@
 {
   "name": "@xian-tech/provider",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Xian browser wallet provider contract and reference provider",
   "repository": {
     "type": "git",
@@ -27,7 +27,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@xian-tech/types": "0.3.3"
+    "@xian-tech/types": "0.3.4"
   },
   "license": "MIT"
 }

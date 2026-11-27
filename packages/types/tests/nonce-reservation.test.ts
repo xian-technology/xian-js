@@ -58,6 +58,14 @@ describe("shared automatic nonce lifecycle", () => {
     expect((await send(reservations, async () => 12)).nonce).toBe(12);
   });
 
+  it("does not reuse an admitted nonce when a later send is refused", async () => {
+    const reservations = manager();
+    const refused = { submitted: true, accepted: false, finalized: false };
+    expect((await send(reservations)).nonce).toBe(7);
+    expect((await send(reservations, async () => 7, refused)).nonce).toBe(8);
+    expect((await send(reservations, async () => 7)).nonce).toBe(8);
+  });
+
   it("consumes a finalized nonce even without separate admission evidence", async () => {
     const reservations = manager();
     await send(reservations, async () => 7, { submitted: true, accepted: null, finalized: true });
